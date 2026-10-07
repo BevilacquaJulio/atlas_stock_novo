@@ -26,7 +26,7 @@ backups ou imagens de produção. Não há garantia de ausência de outras falha
 | --- | --- | --- | --- | --- |
 | 1 | Credenciais públicas e dados demo | Alta | `feat/remover-credenciais-demo` | Implementado; testes e builds aprovados |
 | 2 | Validação de identidade e rotação de tokens | Alta | `feat/endurecer-autenticacao` | Implementado; MySQL, testes e build aprovados |
-| 3 | Concorrência de estoque, compras e projetos | Alta | `feat/transacoes-estoque-compras` | Planejado |
+| 3 | Concorrência de estoque, compras e projetos | Alta | `feat/transacoes-estoque-compras` | Implementado; MySQL, testes e build aprovados |
 | 4 | Consistência dos pagamentos financeiros | Alta | `feat/consistencia-financeiro` | Planejado |
 | 5 | Isolamento das sessões no frontend | Alta | `feat/isolar-sessoes-frontend` | Planejado |
 | 6 | Limites de entrada, logs e configuração HTTP | Média/alta | `feat/validacao-http-segura` | Planejado |
@@ -228,6 +228,13 @@ desativação e cargo atual. Login antigo exige reautenticação após deploy.
 Sem famílias de sessão, reuso revoga todas as sessões do usuário; logout de
 token já rotacionado também revoga todas para encerrar uma renovação concorrente.
 Coordenação entre abas e revogação por família continuam no tópico 7.
+
+Tópico 3: 34 testes unitários e 10 testes MySQL (6 de estoque/compras/projetos,
+4 de autenticação), lint das alterações e build aprovados. Predicados de
+status são avaliados no update dentro da transação; SELECT FOR UPDATE
+parametrizado lê o saldo corrente. As compras adquirem locks de produto na
+ordem de ID. Sem migrations novas. Retry de deadlock, idempotência de criação
+e contabilidade Decimal completa permanecem nos tópicos reservados.
 
 Tópico 1: 2 testes dos guardas de populate, 4 testes de login e builds de
 backend/frontend aprovados. Nenhuma conexão de banco foi aberta pelo populate.

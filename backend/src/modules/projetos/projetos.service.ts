@@ -186,9 +186,9 @@ export class ProjetosService {
   ) {
     const projeto = await this.findOne(projetoId);
 
-    if (projeto.status === 'CANCELADO') {
+    if (!projeto.ativo || projeto.status === 'CANCELADO' || projeto.status === 'CONCLUIDO') {
       throw new BadRequestException(
-        'Não é possível registrar consumo em projeto cancelado.',
+        'Não é possível registrar consumo em projeto inativo ou encerrado.',
       );
     }
 
@@ -197,9 +197,14 @@ export class ProjetosService {
       if (!produto || !produto.ativo) {
         throw new BadRequestException('Produto inválido ou inativo.');
       }
+      if (produto.escopo === 'PROJETO' && produto.projetoId !== projetoId) {
+        throw new BadRequestException('O produto pertence a outro projeto.');
+      }
 
       return this.prisma.$transaction(async (tx) => {
-        await this.movimentacoesRepo.registrar(
+        await this.repo.lockOpenProject(projetoId, tx);
+        try {
+          await this.movimentacoesRepo.registrar(
           {
             produtoId: input.produtoId!,
             tipo: 'SAIDA',
@@ -210,12 +215,21 @@ export class ProjetosService {
             projetoId,
           },
           tx,
-        );
+          );
+        } catch (error) {
+          if (error instanceof Error && error.message === 'ESTOQUE_INSUFICIENTE') {
+            throw new BadRequestException('Estoque insuficiente para este consumo.');
+          }
+          throw error;
+        }
 
         return this.repo.createConsumo(projetoId, input, usuarioId, tx);
       });
     }
 
-    return this.repo.createConsumo(projetoId, input, usuarioId);
+    return this.prisma.$transaction(async (tx) => {
+      await this.repo.lockOpenProject(projetoId, tx);
+      return this.repo.createConsumo(projetoId, input, usuarioId, tx);
+    });
   }
 }

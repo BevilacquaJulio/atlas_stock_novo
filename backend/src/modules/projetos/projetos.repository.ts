@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { Prisma } from '../../../generated/prisma/client';
 import type {
@@ -134,8 +134,8 @@ export class ProjetosRepository {
     },
   ) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.projeto.update({
-        where: { id },
+      const changed = await tx.projeto.updateMany({
+        where: { id, ativo: true, status: data.statusAnterior ?? undefined },
         data: {
           status: data.status,
           ...(data.dataInicio !== undefined ? { dataInicio: data.dataInicio } : {}),
@@ -144,6 +144,8 @@ export class ProjetosRepository {
             : {}),
         },
       });
+
+      if (changed.count !== 1) throw new BadRequestException('O projeto mudou de status. Atualize a página.');
 
       await tx.projetoHistorico.create({
         data: {
@@ -226,6 +228,15 @@ export class ProjetosRepository {
         usuario: { select: { id: true, nome: true } },
       },
     });
+  }
+
+  async lockOpenProject(id: number, tx: Prisma.TransactionClient) {
+    const [project] = await tx.$queryRaw<Array<{ status: string; ativo: number | boolean }>>`
+      SELECT status, ativo FROM projetos WHERE id = ${id} FOR UPDATE
+    `;
+    if (!project?.ativo || !['AGUARDANDO', 'EM_ANDAMENTO'].includes(project.status)) {
+      throw new BadRequestException('Não é possível registrar consumo em projeto inativo ou encerrado.');
+    }
   }
 
   countReferencias(id: number) {

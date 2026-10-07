@@ -1,42 +1,45 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { Prisma } from '../../../generated/prisma/client';
 
 @Injectable()
 export class RefreshTokenRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(usuarioId: number, tokenHash: string, expiresAt: Date) {
-    return this.prisma.refreshToken.create({
-      data: { usuarioId, tokenHash, expiresAt },
+  withUserLock<T>(usuarioId: number, run: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return this.prisma.$transaction(async (tx) => {
+      // Serializa emissão, rotação e revogação para que reuso não deixe um sucessor ativo.
+      await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${usuarioId} FOR UPDATE`;
+      return run(tx);
     });
   }
 
-  createEmpty(usuarioId: number, expiresAt: Date) {
-    return this.prisma.refreshToken.create({
+  createEmpty(usuarioId: number, expiresAt: Date, tx: Prisma.TransactionClient) {
+    return tx.refreshToken.create({
       data: { usuarioId, tokenHash: '', expiresAt },
     });
   }
 
-  setHash(id: number, tokenHash: string) {
-    return this.prisma.refreshToken.update({
+  setHash(id: number, tokenHash: string, tx: Prisma.TransactionClient) {
+    return tx.refreshToken.update({
       where: { id },
       data: { tokenHash },
     });
   }
 
-  findById(id: number) {
-    return this.prisma.refreshToken.findUnique({ where: { id } });
+  findById(id: number, tx: Prisma.TransactionClient) {
+    return tx.refreshToken.findUnique({ where: { id } });
   }
 
-  revoke(id: number) {
-    return this.prisma.refreshToken.update({
+  revoke(id: number, tx: Prisma.TransactionClient) {
+    return tx.refreshToken.update({
       where: { id },
       data: { revokedAt: new Date() },
     });
   }
 
-  revokeAllForUser(usuarioId: number) {
-    return this.prisma.refreshToken.updateMany({
+  revokeAllForUser(usuarioId: number, tx: Prisma.TransactionClient) {
+    return tx.refreshToken.updateMany({
       where: { usuarioId, revokedAt: null },
       data: { revokedAt: new Date() },
     });

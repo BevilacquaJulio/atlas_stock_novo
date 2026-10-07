@@ -29,8 +29,8 @@ export class UsuariosRepository {
     });
   }
 
-  findById(id: number) {
-    return this.prisma.usuario.findUnique({
+  findById(id: number, tx?: Prisma.TransactionClient) {
+    return (tx ?? this.prisma).usuario.findUnique({
       where: { id },
       select: usuarioSelect,
     });

@@ -10,6 +10,7 @@ export interface AuthenticatedUser {
 
 /** Claims do JWT (access token). */
 export interface JwtAccessPayload {
+  purpose: 'access';
   sub: number;
   email: string;
   cargo: Cargo;
@@ -18,6 +19,7 @@ export interface JwtAccessPayload {
 
 /** Claims do JWT (refresh token). */
 export interface JwtRefreshPayload {
+  purpose: 'refresh';
   sub: number;
   tokenId: number;
 }

@@ -1,4 +1,4 @@
-export type DespesaStatus = 'A_PAGAR' | 'PAGO';
+export type DespesaStatus = 'A_PAGAR' | 'PAGO' | 'CANCELADA';
 export type ReceitaStatus = 'A_RECEBER' | 'RECEBIDO';
 
 export interface CategoriaDespesa {

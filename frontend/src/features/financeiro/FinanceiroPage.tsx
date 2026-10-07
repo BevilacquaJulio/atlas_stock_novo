@@ -313,10 +313,10 @@ export default function FinanceiroPage() {
                     {d.dataVencimento ? formatDate(d.dataVencimento) : '—'}
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    {d.status === 'PAGO' ? 'Pago' : 'A pagar'}
+                    {d.status === 'PAGO' ? 'Pago' : d.status === 'CANCELADA' ? 'Cancelada' : 'A pagar'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {d.status === 'A_PAGAR' && (
+                    {d.status === 'A_PAGAR' && d.compraId === null && (
                       <Button
                         variant="secondary"
                         loading={pagarMut.isPending}
@@ -324,6 +324,9 @@ export default function FinanceiroPage() {
                       >
                         Pagar
                       </Button>
+                    )}
+                    {d.status === 'A_PAGAR' && d.compraId !== null && (
+                      <span className="text-sm text-[#0a0a0a]/60">Pagar em Compras</span>
                     )}
                   </td>
                 </tr>

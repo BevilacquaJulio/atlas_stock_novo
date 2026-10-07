@@ -27,7 +27,7 @@ backups ou imagens de produção. Não há garantia de ausência de outras falha
 | 1 | Credenciais públicas e dados demo | Alta | `feat/remover-credenciais-demo` | Implementado; testes e builds aprovados |
 | 2 | Validação de identidade e rotação de tokens | Alta | `feat/endurecer-autenticacao` | Implementado; MySQL, testes e build aprovados |
 | 3 | Concorrência de estoque, compras e projetos | Alta | `feat/transacoes-estoque-compras` | Implementado; MySQL, testes e build aprovados |
-| 4 | Consistência dos pagamentos financeiros | Alta | `feat/consistencia-financeiro` | Planejado |
+| 4 | Consistência dos pagamentos financeiros | Alta | `feat/consistencia-financeiro` | Implementado; MySQL, testes e builds aprovados |
 | 5 | Isolamento das sessões no frontend | Alta | `feat/isolar-sessoes-frontend` | Planejado |
 | 6 | Limites de entrada, logs e configuração HTTP | Média/alta | `feat/validacao-http-segura` | Planejado |
 | 7 | Evolução de sessão, permissões e regras de produto | Alta | A definir juntos | **Reservado** |
@@ -235,6 +235,12 @@ status são avaliados no update dentro da transação; SELECT FOR UPDATE
 parametrizado lê o saldo corrente. As compras adquirem locks de produto na
 ordem de ID. Sem migrations novas. Retry de deadlock, idempotência de criação
 e contabilidade Decimal completa permanecem nos tópicos reservados.
+
+Tópico 4: 6 testes unitários financeiros e 4 cenários MySQL aprovados; lint
+dos arquivos alterados e builds backend/frontend aprovados. Pagamento e
+recebimento usam updateMany condicionado em transação, com leitura do resultado
+na mesma transação. Cancelamento/vínculo com compra e valores quitados são
+protegidos também no banco; nenhuma migration nova.
 
 Tópico 1: 2 testes dos guardas de populate, 4 testes de login e builds de
 backend/frontend aprovados. Nenhuma conexão de banco foi aberta pelo populate.

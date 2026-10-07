@@ -1,0 +1,7 @@
+-- AlterEnum CompraStatus
+ALTER TABLE `compras`
+  MODIFY COLUMN `status` ENUM('A_PAGAR', 'CONFIRMADA', 'PAGO', 'CANCELADA') NOT NULL DEFAULT 'A_PAGAR';
+
+-- AlterEnum DespesaStatus
+ALTER TABLE `despesas`
+  MODIFY COLUMN `status` ENUM('A_PAGAR', 'PAGO', 'CANCELADA') NOT NULL DEFAULT 'A_PAGAR';

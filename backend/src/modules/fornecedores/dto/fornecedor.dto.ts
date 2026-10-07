@@ -1,0 +1,26 @@
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+import {
+  isValidCpfCnpj,
+  onlyDigits,
+} from '../../../common/validators/documents';
+
+export const createFornecedorSchema = z.object({
+  nomeRazaoSocial: z.string().trim().min(2).max(200),
+  cpfCnpj: z
+    .string()
+    .transform(onlyDigits)
+    .refine(isValidCpfCnpj, {
+      message: 'CPF/CNPJ inválido.',
+    }),
+  telefone: z.string().trim().max(30).optional().nullable(),
+  email: z.string().trim().email().max(180).optional().or(z.literal('')).nullable(),
+  ativo: z.boolean().default(true),
+});
+export class CreateFornecedorDto extends createZodDto(createFornecedorSchema) {}
+
+export const updateFornecedorSchema = createFornecedorSchema.partial();
+export class UpdateFornecedorDto extends createZodDto(updateFornecedorSchema) {}
+
+export type CreateFornecedorInput = z.infer<typeof createFornecedorSchema>;
+export type UpdateFornecedorInput = z.infer<typeof updateFornecedorSchema>;

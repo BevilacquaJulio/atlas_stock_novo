@@ -6,20 +6,22 @@ import { UsuariosRepository } from '../usuarios/usuarios.repository';
 import { RefreshTokenRepository } from './refresh-token.repository';
 
 describe('AuthService.login', () => {
-  let usuarios: { findByEmailWithSenha: ReturnType<typeof vi.fn> };
+  let usuarios: { findByEmailWithSenha: ReturnType<typeof vi.fn>; findById: ReturnType<typeof vi.fn> };
   let refreshTokens: {
     createEmpty: ReturnType<typeof vi.fn>;
     setHash: ReturnType<typeof vi.fn>;
+    withUserLock: ReturnType<typeof vi.fn>;
   };
   let jwt: { signAsync: ReturnType<typeof vi.fn> };
   let config: { get: ReturnType<typeof vi.fn> };
   let service: AuthService;
 
   beforeEach(() => {
-    usuarios = { findByEmailWithSenha: vi.fn() };
+    usuarios = { findByEmailWithSenha: vi.fn(), findById: vi.fn().mockResolvedValue({ id: 1, nome: 'Admin', email: 'a@b.com', cargo: 'ADMINISTRADOR', ativo: true }) };
     refreshTokens = {
       createEmpty: vi.fn().mockResolvedValue({ id: 10 }),
       setHash: vi.fn().mockResolvedValue(undefined),
+      withUserLock: vi.fn((_id, run) => run({})),
     };
     jwt = { signAsync: vi.fn().mockResolvedValue('signed.jwt.token') };
     config = { get: vi.fn().mockReturnValue('7d') };

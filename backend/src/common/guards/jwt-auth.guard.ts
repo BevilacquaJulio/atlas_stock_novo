@@ -9,9 +9,10 @@ import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { UsuariosRepository } from '../../modules/usuarios/usuarios.repository';
+import { accessClaimsSchema, jwtPolicy } from '../auth/jwt-policy';
 import type {
   AuthenticatedUser,
-  JwtAccessPayload,
 } from '../types/authenticated-user';
 
 /**
@@ -24,6 +25,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly reflector: Reflector,
+    private readonly usuarios: UsuariosRepository,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -39,22 +41,25 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Token de acesso ausente.');
     }
 
+    let user: AuthenticatedUser;
     try {
-      const payload = await this.jwtService.verifyAsync<JwtAccessPayload>(
+      const payload = accessClaimsSchema.parse(await this.jwtService.verifyAsync(
         token,
-        { secret: this.config.get<string>('JWT_ACCESS_SECRET') },
-      );
-      const user: AuthenticatedUser = {
-        id: payload.sub,
-        nome: payload.nome,
-        email: payload.email,
-        cargo: payload.cargo,
+        { ...jwtPolicy, secret: this.config.get<string>('JWT_ACCESS_SECRET') },
+      ));
+      const usuario = await this.usuarios.findById(payload.sub);
+      if (!usuario?.ativo) throw new UnauthorizedException();
+      user = {
+        id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        cargo: usuario.cargo,
       };
-      request.user = user;
-      return true;
     } catch {
       throw new UnauthorizedException('Token de acesso inválido ou expirado.');
     }
+    request.user = user;
+    return true;
   }
 
   private extractToken(request: Request): string | undefined {

@@ -25,7 +25,7 @@ backups ou imagens de produção. Não há garantia de ausência de outras falha
 | Ordem | Tema | Gravidade | Branch | Estado |
 | --- | --- | --- | --- | --- |
 | 1 | Credenciais públicas e dados demo | Alta | `feat/remover-credenciais-demo` | Implementado; testes e builds aprovados |
-| 2 | Validação de identidade e rotação de tokens | Alta | `feat/endurecer-autenticacao` | Planejado |
+| 2 | Validação de identidade e rotação de tokens | Alta | `feat/endurecer-autenticacao` | Implementado; MySQL, testes e build aprovados |
 | 3 | Concorrência de estoque, compras e projetos | Alta | `feat/transacoes-estoque-compras` | Planejado |
 | 4 | Consistência dos pagamentos financeiros | Alta | `feat/consistencia-financeiro` | Planejado |
 | 5 | Isolamento das sessões no frontend | Alta | `feat/isolar-sessoes-frontend` | Planejado |
@@ -219,6 +219,15 @@ Baseline: Node 22.16.0, npm 10.9.2; Prisma 7.8.0, Vitest 3.2.7.
 Dependências instaladas pelos lockfiles com `npm ci --ignore-scripts`.
 Testes baseline passam (28 backend/4 frontend) fora da restrição de realpath
 do sandbox. Resultados finais, commits e limitações serão acrescentados aqui.
+
+Tópico 2: 32 testes unitários, 4 cenários reais em MySQL 8.4 descartável
+(`127.0.0.1:13316/atlas_audit_test`), lint dos arquivos de autenticação e build
+aprovados. Migrations existentes aplicadas somente nesse banco sintético.
+Os testes cobrem concorrência refresh/logout, reuso, rollback, propósito JWT,
+desativação e cargo atual. Login antigo exige reautenticação após deploy.
+Sem famílias de sessão, reuso revoga todas as sessões do usuário; logout de
+token já rotacionado também revoga todas para encerrar uma renovação concorrente.
+Coordenação entre abas e revogação por família continuam no tópico 7.
 
 Tópico 1: 2 testes dos guardas de populate, 4 testes de login e builds de
 backend/frontend aprovados. Nenhuma conexão de banco foi aberta pelo populate.

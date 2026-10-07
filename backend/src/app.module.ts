@@ -23,6 +23,7 @@ import { ProjetosModule } from './modules/projetos/projetos.module';
 import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { FinanceiroUnlockGuard } from './common/guards/financeiro-unlock.guard';
+import { UsuariosModule } from './modules/usuarios/usuarios.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { FinanceiroUnlockGuard } from './common/guards/financeiro-unlock.guard';
     ]),
     PrismaModule,
     AuthModule,
+    UsuariosModule,
     HealthModule,
     CategoriasModule,
     ProdutosModule,

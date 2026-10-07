@@ -10,8 +10,10 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { FINANCEIRO_UNLOCK_KEY } from '../decorators/financeiro-unlock.decorator';
 import type { AuthenticatedUser } from '../types/authenticated-user';
+import { jwtPolicy } from '../auth/jwt-policy';
 
 interface FinanceiroUnlockPayload {
+  exp: number;
   purpose: string;
   sub: number;
 }
@@ -45,9 +47,9 @@ export class FinanceiroUnlockGuard implements CanActivate {
     try {
       const payload = await this.jwtService.verifyAsync<FinanceiroUnlockPayload>(
         token,
-        { secret: this.config.get<string>('JWT_ACCESS_SECRET') },
+        { ...jwtPolicy, secret: this.config.get<string>('JWT_ACCESS_SECRET') },
       );
-      if (payload.purpose !== 'financeiro_unlock' || payload.sub !== user?.id) {
+      if (payload.purpose !== 'financeiro_unlock' || payload.sub !== user?.id || !Number.isInteger(payload.exp)) {
         throw new ForbiddenException('Token de desbloqueio inválido.');
       }
       return true;

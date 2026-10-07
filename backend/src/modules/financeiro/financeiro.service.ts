@@ -19,6 +19,7 @@ import type {
 } from './dto/financeiro.dto';
 import type { Prisma } from '../../../generated/prisma/client';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { jwtPolicy } from '../../common/auth/jwt-policy';
 
 @Injectable()
 export class FinanceiroService {
@@ -42,6 +43,9 @@ export class FinanceiroService {
     const token = await this.jwtService.signAsync(
       { purpose: 'financeiro_unlock', sub: user.id },
       {
+        issuer: jwtPolicy.issuer,
+        audience: jwtPolicy.audience,
+        algorithm: 'HS256',
         secret: this.config.get<string>('JWT_ACCESS_SECRET'),
         expiresIn,
       },

@@ -1,23 +1,21 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UsuariosRepository } from '../usuarios/usuarios.repository';
 import { RefreshTokenRepository } from './refresh-token.repository';
-import type {
-  AuthenticatedUser,
-  JwtAccessPayload,
-  JwtRefreshPayload,
-} from '../../common/types/authenticated-user';
+import { jwtPolicy, refreshClaimsSchema } from '../../common/auth/jwt-policy';
+import type { AuthenticatedUser, JwtAccessPayload, JwtRefreshPayload } from '../../common/types/authenticated-user';
+import type { Prisma } from '../../../generated/prisma/client';
 
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
 }
-
 export type LoginResult = TokenPair & { user: AuthenticatedUser };
-
 type ExpiresIn = JwtSignOptions['expiresIn'];
+const digest = (token: string) => createHash('sha256').update(token).digest('hex');
 
 @Injectable()
 export class AuthService {
@@ -30,114 +28,98 @@ export class AuthService {
 
   async login(email: string, senha: string): Promise<LoginResult> {
     const usuario = await this.usuarios.findByEmailWithSenha(email);
-    if (!usuario || !usuario.ativo) {
+    if (!usuario?.ativo || !(await bcrypt.compare(senha, usuario.senha))) {
       throw new UnauthorizedException('Credenciais inválidas.');
     }
-    const ok = await bcrypt.compare(senha, usuario.senha);
-    if (!ok) {
-      throw new UnauthorizedException('Credenciais inválidas.');
-    }
-
-    const user: AuthenticatedUser = {
-      id: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      cargo: usuario.cargo,
-    };
-    const tokens = await this.issueTokens(user);
-    return { ...tokens, user };
+    return this.refreshTokens.withUserLock(usuario.id, async (tx) => {
+      const current = await this.usuarios.findById(usuario.id, tx);
+      if (!current?.ativo) throw new UnauthorizedException('Credenciais inválidas.');
+      const user = this.publicUser(current);
+      return { ...await this.issueTokens(user, tx), user };
+    });
   }
 
   async refresh(refreshToken: string): Promise<TokenPair> {
-    let payload: JwtRefreshPayload;
-    try {
-      payload = await this.jwt.verifyAsync<JwtRefreshPayload>(refreshToken, {
-        secret: this.config.get<string>('JWT_REFRESH_SECRET'),
-      });
-    } catch {
-      throw new UnauthorizedException('Refresh token inválido ou expirado.');
-    }
-
-    const stored = await this.refreshTokens.findById(payload.tokenId);
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-      throw new UnauthorizedException('Sessão expirada. Faça login novamente.');
-    }
-
-    const matches = await bcrypt.compare(refreshToken, stored.tokenHash);
-    if (!matches) {
-      // Possível reuso de token — revoga todas as sessões do usuário.
-      await this.refreshTokens.revokeAllForUser(stored.usuarioId);
-      throw new UnauthorizedException('Refresh token inválido.');
-    }
-
-    const usuario = await this.usuarios.findById(payload.sub);
-    if (!usuario || !usuario.ativo) {
-      throw new UnauthorizedException('Usuário indisponível.');
-    }
-
-    // Rotação: revoga o token usado e emite um novo par.
-    await this.refreshTokens.revoke(stored.id);
-    return this.issueTokens({
-      id: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      cargo: usuario.cargo,
+    const payload = await this.verifyRefresh(refreshToken);
+    const tokens = await this.refreshTokens.withUserLock(payload.sub, async (tx) => {
+      const stored = await this.refreshTokens.findById(payload.tokenId, tx);
+      if (!stored || stored.usuarioId !== payload.sub) return null;
+      if (stored.revokedAt || stored.tokenHash !== digest(refreshToken)) {
+        // O 401 vem após o commit para preservar a revogação ao detectar reuso.
+        await this.refreshTokens.revokeAllForUser(payload.sub, tx);
+        return null;
+      }
+      if (stored.expiresAt <= new Date()) return null;
+      const usuario = await this.usuarios.findById(payload.sub, tx);
+      if (!usuario?.ativo) {
+        await this.refreshTokens.revokeAllForUser(payload.sub, tx);
+        return null;
+      }
+      await this.refreshTokens.revoke(stored.id, tx);
+      return this.issueTokens(this.publicUser(usuario), tx);
     });
+    if (!tokens) throw new UnauthorizedException('Sessão expirada. Faça login novamente.');
+    return tokens;
   }
 
   async logout(refreshToken: string): Promise<void> {
+    let payload: JwtRefreshPayload;
     try {
-      const payload = await this.jwt.verifyAsync<JwtRefreshPayload>(
-        refreshToken,
-        { secret: this.config.get<string>('JWT_REFRESH_SECRET') },
-      );
-      await this.refreshTokens.revoke(payload.tokenId);
+      payload = await this.verifyRefresh(refreshToken);
     } catch {
-      // Logout é idempotente: token inválido não é erro para o cliente.
+      return;
+    }
+    await this.refreshTokens.withUserLock(payload.sub, async (tx) => {
+      const stored = await this.refreshTokens.findById(payload.tokenId, tx);
+      if (!stored || stored.usuarioId !== payload.sub || stored.tokenHash !== digest(refreshToken)) return;
+      if (stored.revokedAt) {
+        await this.refreshTokens.revokeAllForUser(payload.sub, tx);
+      } else {
+        await this.refreshTokens.revoke(stored.id, tx);
+      }
+    });
+  }
+
+  private async verifyRefresh(token: string): Promise<JwtRefreshPayload> {
+    try {
+      return refreshClaimsSchema.parse(await this.jwt.verifyAsync(token, {
+        ...jwtPolicy, secret: this.config.get<string>('JWT_REFRESH_SECRET'),
+      }));
+    } catch {
+      throw new UnauthorizedException('Refresh token inválido ou expirado.');
     }
   }
 
-  private async issueTokens(user: AuthenticatedUser): Promise<TokenPair> {
+  private publicUser(user: AuthenticatedUser): AuthenticatedUser {
+    return { id: user.id, nome: user.nome, email: user.email, cargo: user.cargo };
+  }
+
+  private async issueTokens(user: AuthenticatedUser, tx: Prisma.TransactionClient): Promise<TokenPair> {
     const accessPayload: JwtAccessPayload = {
-      sub: user.id,
-      email: user.email,
-      cargo: user.cargo,
-      nome: user.nome,
+      purpose: 'access', sub: user.id, email: user.email, cargo: user.cargo, nome: user.nome,
     };
+    const options = { issuer: jwtPolicy.issuer, audience: jwtPolicy.audience, algorithm: 'HS256' as const };
     const accessToken = await this.jwt.signAsync(accessPayload, {
-      secret: this.config.get<string>('JWT_ACCESS_SECRET'),
-      expiresIn: this.config.get<string>(
-        'JWT_ACCESS_EXPIRES_IN',
-        '15m',
-      ) as ExpiresIn,
+      ...options, secret: this.config.get<string>('JWT_ACCESS_SECRET'),
+      expiresIn: this.config.get<string>('JWT_ACCESS_EXPIRES_IN', '15m') as ExpiresIn,
+      jwtid: randomUUID(),
     });
-
     const refreshTtl = this.config.get<string>('JWT_REFRESH_EXPIRES_IN', '7d');
-    const expiresAt = new Date(Date.now() + this.parseDurationMs(refreshTtl));
-    const row = await this.refreshTokens.createEmpty(user.id, expiresAt);
-
-    const refreshPayload: JwtRefreshPayload = { sub: user.id, tokenId: row.id };
+    const expiresAt = new Date(Date.now() + parseDurationMs(refreshTtl));
+    const row = await this.refreshTokens.createEmpty(user.id, expiresAt, tx);
+    const refreshPayload: JwtRefreshPayload = { purpose: 'refresh', sub: user.id, tokenId: row.id };
     const refreshToken = await this.jwt.signAsync(refreshPayload, {
-      secret: this.config.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: refreshTtl as ExpiresIn,
+      ...options, secret: this.config.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: refreshTtl as ExpiresIn, jwtid: randomUUID(),
     });
-    await this.refreshTokens.setHash(row.id, await bcrypt.hash(refreshToken, 10));
-
+    await this.refreshTokens.setHash(row.id, digest(refreshToken), tx);
     return { accessToken, refreshToken };
   }
+}
 
-  /** Converte '15m' | '7d' | '24h' | '30s' em milissegundos. */
-  private parseDurationMs(value: string): number {
-    const match = /^(\d+)([smhd])$/.exec(value.trim());
-    if (!match) return 7 * 24 * 60 * 60 * 1000;
-    const amount = Number(match[1]);
-    const unit = match[2];
-    const factor: Record<string, number> = {
-      s: 1000,
-      m: 60 * 1000,
-      h: 60 * 60 * 1000,
-      d: 24 * 60 * 60 * 1000,
-    };
-    return amount * factor[unit];
-  }
+export function parseDurationMs(value: string): number {
+  const match = /^(\d+)([smhd])$/.exec(value);
+  if (!match) throw new Error('Duração de token inválida.');
+  const factor: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
+  return Number(match[1]) * factor[match[2]];
 }

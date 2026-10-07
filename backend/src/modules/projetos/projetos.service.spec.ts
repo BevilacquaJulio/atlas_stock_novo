@@ -34,17 +34,19 @@ describe('ProjetosService', () => {
   let projetosRepo: ReturnType<typeof makeProjetosRepo>;
   let clientesRepo: ReturnType<typeof makeClientesRepo>;
   let veiculosRepo: ReturnType<typeof makeVeiculosRepo>;
+  let produtosRepo: ReturnType<typeof makeProdutosRepo>;
   let service: ProjetosService;
 
   beforeEach(() => {
     projetosRepo = makeProjetosRepo();
     clientesRepo = makeClientesRepo();
     veiculosRepo = makeVeiculosRepo();
+    produtosRepo = makeProdutosRepo();
     service = new ProjetosService(
       projetosRepo as unknown as ProjetosRepository,
       clientesRepo as unknown as ClientesRepository,
       veiculosRepo as unknown as VeiculosRepository,
-      makeProdutosRepo() as unknown as ProdutosRepository,
+      produtosRepo as unknown as ProdutosRepository,
       makeMovimentacoesRepo() as unknown as MovimentacoesRepository,
       makePrisma() as unknown as PrismaService,
     );
@@ -101,5 +103,19 @@ describe('ProjetosService', () => {
     await expect(
       service.alterarStatus(1, { status: 'EM_ANDAMENTO' }, 1),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejeita consumo em projeto concluído antes de alterar estoque', async () => {
+    projetosRepo.findById.mockResolvedValue({ id: 1, ativo: true, status: 'CONCLUIDO' });
+    await expect(service.registrarConsumo(1, { tipo: 'PRODUTO', produtoId: 2, quantidade: 1, valorUnitario: 10 }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    expect(produtosRepo.findById).not.toHaveBeenCalled();
+    expect(projetosRepo.createConsumo).not.toHaveBeenCalled();
+  });
+
+  it('rejeita produto vinculado a outro projeto sem registrar consumo', async () => {
+    projetosRepo.findById.mockResolvedValue({ id: 1, ativo: true, status: 'EM_ANDAMENTO' });
+    produtosRepo.findById.mockResolvedValue({ id: 2, ativo: true, escopo: 'PROJETO', projetoId: 99 });
+    await expect(service.registrarConsumo(1, { tipo: 'PRODUTO', produtoId: 2, quantidade: 1, valorUnitario: 10 }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    expect(projetosRepo.createConsumo).not.toHaveBeenCalled();
   });
 });

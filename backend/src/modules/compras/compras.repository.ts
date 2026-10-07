@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { Prisma } from '../../../generated/prisma/client';
+import type { CompraStatus, Prisma } from '../../../generated/prisma/client';
 import type { CreateCompraInput } from './dto/compra.dto';
 
 const compraInclude = {
@@ -55,12 +55,14 @@ export class ComprasRepository {
     });
   }
 
-  cancelarCompra(id: number) {
+  async transition(tx: Prisma.TransactionClient, id: number, expected: CompraStatus, data: Prisma.CompraUpdateManyMutationInput) {
+    const { count } = await tx.compra.updateMany({ where: { id, status: expected }, data });
+    if (count !== 1) throw new BadRequestException('A compra mudou de status. Atualize a página e tente novamente.');
+  }
+
+  cancelarCompra(id: number, expected: CompraStatus) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.compra.update({
-        where: { id },
-        data: { status: 'CANCELADA' },
-      });
+      await this.transition(tx, id, expected, { status: 'CANCELADA', dataPagamento: null });
 
       await tx.despesa.updateMany({
         where: {

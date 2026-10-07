@@ -105,18 +105,10 @@ export class ComprasService {
     const dataPagamento = input.dataPagamento ?? new Date();
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.compra.update({
-        where: { id },
-        data: {
-          status: 'PAGO',
-          dataPagamento,
-          despesa: {
-            update: {
-              status: 'PAGO',
-              dataPagamento,
-            },
-          },
-        },
+      await this.repo.transition(tx, id, 'A_PAGAR', { status: 'PAGO', dataPagamento });
+      await tx.despesa.update({
+        where: { compraId: id },
+        data: { status: 'PAGO', dataPagamento },
       });
 
       return tx.compra.findUniqueOrThrow({
@@ -140,7 +132,8 @@ export class ComprasService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      for (const item of compra.itens) {
+      await this.repo.transition(tx, id, 'PAGO', { status: 'CONFIRMADA' });
+      for (const item of [...compra.itens].sort((a, b) => a.produtoId - b.produtoId)) {
         await this.registrarMovimentacao(
           {
             produtoId: item.produtoId,
@@ -154,11 +147,6 @@ export class ComprasService {
           tx,
         );
       }
-
-      await tx.compra.update({
-        where: { id },
-        data: { status: 'CONFIRMADA' },
-      });
 
       return tx.compra.findUniqueOrThrow({
         where: { id },
@@ -178,7 +166,8 @@ export class ComprasService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      for (const item of compra.itens) {
+      await this.repo.transition(tx, id, 'CONFIRMADA', { status: 'PAGO' });
+      for (const item of [...compra.itens].sort((a, b) => a.produtoId - b.produtoId)) {
         await this.registrarMovimentacao(
           {
             produtoId: item.produtoId,
@@ -192,11 +181,6 @@ export class ComprasService {
           tx,
         );
       }
-
-      await tx.compra.update({
-        where: { id },
-        data: { status: 'PAGO' },
-      });
 
       return tx.compra.findUniqueOrThrow({
         where: { id },
@@ -221,18 +205,10 @@ export class ComprasService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.compra.update({
-        where: { id },
-        data: {
-          status: 'A_PAGAR',
-          dataPagamento: null,
-          despesa: {
-            update: {
-              status: 'A_PAGAR',
-              dataPagamento: null,
-            },
-          },
-        },
+      await this.repo.transition(tx, id, 'PAGO', { status: 'A_PAGAR', dataPagamento: null });
+      await tx.despesa.update({
+        where: { compraId: id },
+        data: { status: 'A_PAGAR', dataPagamento: null },
       });
 
       return tx.compra.findUniqueOrThrow({
@@ -254,7 +230,7 @@ export class ComprasService {
       );
     }
 
-    return this.repo.cancelarCompra(id);
+    return this.repo.cancelarCompra(id, compra.status);
   }
 
   private async registrarMovimentacao(

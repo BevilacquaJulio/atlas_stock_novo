@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { Prisma } from '../../../generated/prisma/client';
+import type { Prisma, Produto } from '../../../generated/prisma/client';
 
 type RegistrarParams = {
   produtoId: number;
@@ -67,7 +67,11 @@ export class MovimentacoesRepository {
       projetoId,
     } = params;
 
-    const produto = await tx.produto.findUnique({ where: { id: produtoId } });
+    // Lock e leitura corrente evitam saldo obsoleto após esperar outra transação.
+    const [produto] = await tx.$queryRaw<Array<Pick<Produto, 'quantidadeEstoque' | 'custoMedio'>>>`
+      SELECT quantidade_estoque AS quantidadeEstoque, custo_medio AS custoMedio
+      FROM produtos WHERE id = ${produtoId} FOR UPDATE
+    `;
     if (!produto) {
       throw new Error('PRODUTO_NAO_ENCONTRADO');
     }

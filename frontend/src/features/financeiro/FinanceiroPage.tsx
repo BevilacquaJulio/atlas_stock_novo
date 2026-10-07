@@ -168,7 +168,7 @@ export default function FinanceiroPage() {
           </form>
           <p className="mt-4 text-xs text-[#0a0a0a]/45">
             Administradores acessam sem senha adicional. Demais usuários usam a
-            senha configurada no seed (padrão: financeiro123).
+            senha fornecida pelo administrador.
           </p>
         </div>
       </>

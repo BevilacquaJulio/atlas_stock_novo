@@ -10,11 +10,6 @@ import { TextField } from '../../components/form/TextField';
 import { Button } from '../../components/Button';
 import { Alert } from '../../components/feedback';
 import { BrandLogo } from '../../components/BrandLogo';
-import {
-  demoAdminEmail,
-  demoAdminPassword,
-  isDemoLoginEnabled,
-} from '../../lib/demo-auth';
 
 const loginSchema = z.object({
   email: z.string().email('E-mail inválido.'),
@@ -29,7 +24,6 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
 
@@ -45,11 +39,6 @@ export default function LoginPage() {
     } catch (err) {
       setApiError(getApiErrorMessage(err, 'Não foi possível entrar.'));
     }
-  };
-
-  const fillDemoCredentials = () => {
-    setValue('email', demoAdminEmail, { shouldValidate: true, shouldDirty: true });
-    setValue('senha', demoAdminPassword, { shouldValidate: true, shouldDirty: true });
   };
 
   return (
@@ -116,16 +105,6 @@ export default function LoginPage() {
           <Button type="submit" loading={isSubmitting} className="mt-2 w-full">
             Entrar
           </Button>
-          {isDemoLoginEnabled && (
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full"
-              onClick={fillDemoCredentials}
-            >
-              Preencher acesso demo
-            </Button>
-          )}
         </form>
       </motion.div>
     </main>

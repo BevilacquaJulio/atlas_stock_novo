@@ -15,12 +15,6 @@ vi.mock('./useAuth', () => ({
   }),
 }));
 
-vi.mock('../../lib/demo-auth', () => ({
-  demoAdminEmail: 'admin@atlas.com',
-  demoAdminPassword: 'atlas_stock123',
-  isDemoLoginEnabled: true,
-}));
-
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -46,14 +40,11 @@ describe('LoginPage', () => {
     expect(loginMock).not.toHaveBeenCalled();
   });
 
-  it('preenche credenciais demo ao clicar no botão', async () => {
-    const user = userEvent.setup();
+  it('não oferece credenciais de demonstração', () => {
     renderPage();
-
-    await user.click(screen.getByRole('button', { name: 'Preencher acesso demo' }));
-
-    expect(screen.getByLabelText('E-mail')).toHaveValue('admin@atlas.com');
-    expect(screen.getByLabelText('Senha')).toHaveValue('atlas_stock123');
+    expect(screen.queryByRole('button', { name: 'Preencher acesso demo' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('E-mail')).toHaveValue('');
+    expect(screen.getByLabelText('Senha')).toHaveValue('');
   });
 
   it('chama login com credenciais válidas', async () => {

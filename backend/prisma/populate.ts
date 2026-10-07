@@ -10,16 +10,20 @@
  * Idempotente: registros demo usam e-mails @atlas.com / códigos DEMO-*.
  * Para repopular do zero, defina POPULATE_RESET=1 (apaga apenas dados demo).
  */
+import 'dotenv/config';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import * as bcrypt from 'bcryptjs';
 import {
   PrismaClient,
   type Prisma,
 } from '../generated/prisma/client';
-import { buildDatabaseUrl } from '../src/config/database-url';
+import { buildDatabaseConfig } from '../src/config/database-url';
+import { validateDemoPopulate } from '../src/config/demo-populate';
+
+validateDemoPopulate(process.env);
 
 const prisma = new PrismaClient({
-  adapter: new PrismaMariaDb(buildDatabaseUrl()),
+  adapter: new PrismaMariaDb(buildDatabaseConfig()),
 });
 
 const DEMO_CLIENTE_EMAILS = [
@@ -104,8 +108,8 @@ async function registrarMovimentacao(
 }
 
 async function ensureAdmin() {
-  const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@atlas.com';
-  const senha = process.env.SEED_ADMIN_PASSWORD ?? 'admin123';
+  const email = process.env.SEED_ADMIN_EMAIL!;
+  const senha = process.env.SEED_ADMIN_PASSWORD!;
   const senhaHash = await bcrypt.hash(senha, 10);
 
   return prisma.usuario.upsert({
@@ -201,7 +205,7 @@ async function main() {
   }
 
   const admin = await ensureAdmin();
-  const senhaPadrao = await bcrypt.hash('demo123', 10);
+  const senhaPadrao = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD!, 10);
 
   const gerente = await prisma.usuario.upsert({
     where: { email: 'gerente@atlas.com' },
@@ -887,13 +891,13 @@ async function main() {
   // eslint-disable-next-line no-console
   console.log('── Usuários ──');
   // eslint-disable-next-line no-console
-  console.log(`  Admin:    ${process.env.SEED_ADMIN_EMAIL ?? 'admin@atlas.com'} / ${process.env.SEED_ADMIN_PASSWORD ?? 'admin123'}`);
+  console.log('Usuários de demonstração criados. Senhas não são exibidas.');
   // eslint-disable-next-line no-console
-  console.log('  Gerente:  gerente@atlas.com / demo123');
+  console.log('  Gerente:  gerente@atlas.com');
   // eslint-disable-next-line no-console
-  console.log('  Operador: operador@atlas.com / demo123');
+  console.log('  Operador: operador@atlas.com');
   // eslint-disable-next-line no-console
-  console.log(`  Financeiro (desbloqueio): ${process.env.SEED_FINANCEIRO_SENHA ?? 'financeiro123'}`);
+  console.log('O desbloqueio financeiro é configurado pelo seed inicial.');
   // eslint-disable-next-line no-console
   console.log('\n── Resumo demo ──');
   // eslint-disable-next-line no-console

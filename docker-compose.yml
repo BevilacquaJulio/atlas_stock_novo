@@ -36,8 +36,6 @@ services:
       args:
         # VITE_* e compilado no build (build-time). Aponta para a API publica.
         VITE_API_URL: https://api.${DOMAIN}/api
-        VITE_DEMO_ADMIN_EMAIL: ${VITE_DEMO_ADMIN_EMAIL:-admin@atlas.com}
-        VITE_DEMO_ADMIN_PASSWORD: ${VITE_DEMO_ADMIN_PASSWORD:-atlas_stock123}
     container_name: bl_g5-app
     restart: unless-stopped
     depends_on:

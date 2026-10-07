@@ -145,7 +145,7 @@ export class FinanceiroRepository {
     return this.changeRevenue(id, { status: 'RECEBIDO', dataRecebimento });
   }
 
-  private changeExpense(id: number, data: Prisma.DespesaUpdateManyMutationInput) {
+  private changeExpense(id: number, data: Prisma.DespesaUncheckedUpdateManyInput) {
     return this.prisma.$transaction(async (tx) => {
       const changed = await tx.despesa.updateMany({ where: { id, status: 'A_PAGAR', compraId: null }, data });
       if (changed.count !== 1) throw new BadRequestException('Despesa indisponível para esta alteração. Atualize a página.');
@@ -153,7 +153,7 @@ export class FinanceiroRepository {
     });
   }
 
-  private changeRevenue(id: number, data: Prisma.ReceitaUpdateManyMutationInput) {
+  private changeRevenue(id: number, data: Prisma.ReceitaUncheckedUpdateManyInput) {
     return this.prisma.$transaction(async (tx) => {
       const changed = await tx.receita.updateMany({ where: { id, status: 'A_RECEBER' }, data });
       if (changed.count !== 1) throw new BadRequestException('Receita indisponível para esta alteração. Atualize a página.');

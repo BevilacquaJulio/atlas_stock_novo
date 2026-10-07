@@ -24,8 +24,7 @@ export async function fetchMe(): Promise<AuthUser> {
   return data;
 }
 
-export async function logoutRequest(): Promise<void> {
-  const refreshToken = tokenStore.getRefresh();
+export async function logoutRequest(refreshToken = tokenStore.getRefresh()): Promise<void> {
   if (refreshToken) {
     await api.post('/auth/logout', { refreshToken }).catch(() => undefined);
   }

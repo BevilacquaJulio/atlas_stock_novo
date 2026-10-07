@@ -6,8 +6,10 @@
 const REFRESH_KEY = 'g5.refreshToken';
 
 let accessToken: string | null = null;
+let generation = 0;
 
 export const tokenStore = {
+  getGeneration: (): number => generation,
   getAccess: (): string | null => accessToken,
   setAccess: (token: string | null): void => {
     accessToken = token;
@@ -18,6 +20,7 @@ export const tokenStore = {
     else localStorage.removeItem(REFRESH_KEY);
   },
   clear: (): void => {
+    generation += 1;
     accessToken = null;
     localStorage.removeItem(REFRESH_KEY);
   },

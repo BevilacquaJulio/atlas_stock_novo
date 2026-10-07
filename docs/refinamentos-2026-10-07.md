@@ -28,7 +28,7 @@ backups ou imagens de produção. Não há garantia de ausência de outras falha
 | 2 | Validação de identidade e rotação de tokens | Alta | `feat/endurecer-autenticacao` | Implementado; MySQL, testes e build aprovados |
 | 3 | Concorrência de estoque, compras e projetos | Alta | `feat/transacoes-estoque-compras` | Implementado; MySQL, testes e build aprovados |
 | 4 | Consistência dos pagamentos financeiros | Alta | `feat/consistencia-financeiro` | Implementado; MySQL, testes e builds aprovados |
-| 5 | Isolamento das sessões no frontend | Alta | `feat/isolar-sessoes-frontend` | Planejado |
+| 5 | Isolamento das sessões no frontend | Alta | `feat/isolar-sessoes-frontend` | Implementado; 13 testes, lint e build aprovados |
 | 6 | Limites de entrada, logs e configuração HTTP | Média/alta | `feat/validacao-http-segura` | Planejado |
 | 7 | Evolução de sessão, permissões e regras de produto | Alta | A definir juntos | **Reservado** |
 | 8 | Dependências, infraestrutura e qualidade de entrega | Alta | A definir juntos | **Reservado** |
@@ -241,6 +241,13 @@ dos arquivos alterados e builds backend/frontend aprovados. Pagamento e
 recebimento usam updateMany condicionado em transação, com leitura do resultado
 na mesma transação. Cancelamento/vínculo com compra e valores quitados são
 protegidos também no banco; nenhuma migration nova.
+
+Tópico 5: 13 testes frontend, lint dos arquivos alterados e build aprovados.
+Testes do cliente exercitam Axios/interceptors com adapter sintético, sem
+acesso a serviços externos. Cobrem single-flight, dois 401, refresh/resposta
+atrasada, limpeza imediata no logout/expiração e bloqueio de URLs externas.
+Testes do provider comprovam remoção de cache/desbloqueio na troca de conta.
+O refresh segue em localStorage até a evolução conjunta do tópico 7.
 
 Tópico 1: 2 testes dos guardas de populate, 4 testes de login e builds de
 backend/frontend aprovados. Nenhuma conexão de banco foi aberta pelo populate.

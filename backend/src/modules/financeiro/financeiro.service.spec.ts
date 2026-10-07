@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   ConflictException,
+  BadRequestException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -79,5 +80,19 @@ describe('FinanceiroService', () => {
     await expect(
       service.createCategoriaDespesa({ nome: 'Operacional', ativo: true }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('despesa vinculada a compra não pode ser paga pelo financeiro', async () => {
+    repo.findDespesaById.mockResolvedValue({ id: 1, compraId: 10, status: 'A_PAGAR' });
+    await expect(service.pagarDespesa(1)).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.pagarDespesa).not.toHaveBeenCalled();
+  });
+
+  it('despesa cancelada não pode ser paga ou editada', async () => {
+    repo.findDespesaById.mockResolvedValue({ id: 1, compraId: null, status: 'CANCELADA' });
+    await expect(service.pagarDespesa(1)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.updateDespesa(1, { valor: 2 })).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.pagarDespesa).not.toHaveBeenCalled();
+    expect(repo.updateDespesa).not.toHaveBeenCalled();
   });
 });

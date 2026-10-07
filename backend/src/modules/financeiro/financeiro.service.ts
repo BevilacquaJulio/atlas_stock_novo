@@ -98,16 +98,19 @@ export class FinanceiroService {
         'Despesas geradas por compras não podem ser editadas aqui.',
       );
     }
-    if (despesa.status === 'PAGO') {
-      throw new BadRequestException('Despesa já paga não pode ser editada.');
+    if (despesa.status !== 'A_PAGAR') {
+      throw new BadRequestException('Somente despesas a pagar podem ser editadas.');
     }
     return this.repo.updateDespesa(id, input);
   }
 
   async pagarDespesa(id: number, dataPagamento?: Date) {
     const despesa = await this.findDespesa(id);
-    if (despesa.status === 'PAGO') {
-      throw new BadRequestException('Despesa já está paga.');
+    if (despesa.compraId != null) {
+      throw new BadRequestException('Pague esta despesa pelo módulo de compras.');
+    }
+    if (despesa.status !== 'A_PAGAR') {
+      throw new BadRequestException('Somente despesas a pagar podem ser pagas.');
     }
     return this.repo.pagarDespesa(id, dataPagamento ?? new Date());
   }

@@ -12,6 +12,7 @@ import {
   receberReceita,
 } from './financeiro.api';
 import { financeiroUnlockStore } from '../../lib/financeiro-unlock';
+import { tokenStore } from '../../lib/token-store';
 import type {
   DespesaFormValues,
   FinanceiroQuery,
@@ -33,8 +34,13 @@ export function useFinanceiroStatus() {
 export function useDesbloquearFinanceiro() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (senha: string) => desbloquearFinanceiro(senha),
+    mutationFn: async (senha: string) => {
+      const generation = tokenStore.getGeneration();
+      const data = await desbloquearFinanceiro(senha);
+      return { ...data, generation };
+    },
     onSuccess: (data) => {
+      if (data.generation !== tokenStore.getGeneration()) return;
       if (data.token) financeiroUnlockStore.set(data.token);
       qc.invalidateQueries({ queryKey: ['financeiro'] });
     },

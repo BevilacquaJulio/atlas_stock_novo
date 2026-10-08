@@ -68,7 +68,7 @@ Playwright usa o build da API e o bundle real do frontend, sem mock de rede:
 - Projeto: criação com cliente/veículo, status, checklist, consumo de produto e conclusão; saldo conferido.
 - Financeiro: senha incorreta/correta, despesa/pagamento, receita/recebimento e limpeza do desbloqueio no logout.
 
-Um worker e nenhum retry mascaram falhas. Cada teste cria fixtures próprias,
+Um worker, com retries desativados, mantém as falhas visíveis. Cada teste cria fixtures próprias,
 remove somente seus registros e usa credenciais sintéticas. O guard recusa
 outro banco antes de iniciar os servidores. Não há reset ou acesso à base
 de produção. HTML/trace de falha contém apenas dados do ambiente sintético.
@@ -132,8 +132,9 @@ gh api --method POST repos/BevilacquaJulio/atlas_stock_novo/rulesets --input .gi
 
 Se já houver um ruleset com esse nome, obter seu ID e usar `PUT` no endpoint
 `repos/BevilacquaJulio/atlas_stock_novo/rulesets/ID`; não duplicar nem apagar
-outras proteções. YAML sozinho não ativa proteção. O estado de aplicação e os
-resultados remotos serão registrados na entrega do PR.
+outras proteções. YAML sozinho não ativa proteção. Em 08/10/2026, o ruleset
+foi aplicado e confirmado como ativo, ID `24695879`, sem bypass. O PR passou
+de `UNSTABLE` para `BLOCKED` após essa configuração.
 
 ## Validação inicial e pendências
 
@@ -153,9 +154,25 @@ no grafo auditado devido a relações de dependências; não será ignorado.
 Na inspeção inicial não havia `SONAR_TOKEN`, proteção de main ou default
 setup CodeQL. Sonar automático existia. Integração Sonar via Actions e a
 configuração de mudanças pequenas precisam de acesso externo. Docker local
-está desligado; testes MySQL e E2E serão validados nos runners, antes de
-declarar os checks aprovados. CI não será considerada totalmente validada nem
-o PR mesclado se seus critérios obrigatórios continuarem pendentes.
+está desligado; os testes de banco e navegador usam os runners hospedados.
+CI não será considerada totalmente validada nem o PR mesclado se seus
+critérios obrigatórios continuarem pendentes.
+
+O [PR #7](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/7) executou
+os workflows no GitHub. Na [primeira execução](https://github.com/BevilacquaJulio/atlas_stock_novo/actions/runs/37723042803),
+backend e frontend aprovaram lint, tipos, builds, 44 testes unitários de API,
+24 testes HTTP/MySQL e 13 testes de frontend. As cinco migrations foram
+aplicadas no banco vazio. Os quatro artefatos de build/LCOV foram produzidos
+e os builds foram consumidos pelo E2E.
+
+O [CodeQL](https://github.com/BevilacquaJulio/atlas_stock_novo/actions/runs/37723043025)
+concluiu sem erro ou warning de processamento; a API de code scanning
+confirmou zero alertas abertos em `refs/pull/7/merge`. A auditoria reproduziu
+as 17 entradas de backend e 3 altas de frontend. Sonar via CI falhou por
+`SONAR_TOKEN` ausente. O agregador `CI Required` reprovou corretamente.
+A primeira execução E2E expôs seletores incorretos dos novos testes; foram
+ajustados às rotas, botões, listboxes e abas existentes. A execução atual do
+PR deve comprovar as seis jornadas, sem retries ou casos ignorados.
 
 Fontes oficiais consultadas:
 [GitHub merge protection](https://docs.github.com/en/code-security/concepts/code-scanning/merge-protection),

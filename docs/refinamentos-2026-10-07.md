@@ -210,7 +210,10 @@ Triagem e próximos passos:
   sensíveis são 10/min no login/desbloqueio e 30/min no refresh. Nunca confiar
   indiscriminadamente em X-Forwarded-For. O teste HTTP usa acesso direto.
 - CI começou a ser implementada em 08/10/2026 na branch
-  `feat/ci-validacao-prs`, por solicitação posterior. Configuração, E2E,
+  `feat/ci-validacao-prs`, por solicitação posterior, no
+  [PR #7](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/7).
+  Proteção de main aplicada; integração MySQL e CodeQL aprovados no GitHub.
+  Configuração, E2E,
   critérios e integrações externas estão em [ci.md](ci.md). O restante de
   dependências/infraestrutura continua reservado; nenhum bloqueio de audit
   será omitido para permitir merge.

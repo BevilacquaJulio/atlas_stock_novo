@@ -8,6 +8,7 @@ async function choose(
 ): Promise<void> {
   await scope.getByRole('combobox', { name: label, exact: true }).click();
   await scope
+    .getByRole('listbox', { name: label, exact: true })
     .getByRole('option', { name: option, exact: typeof option === 'string' })
     .click();
 }
@@ -56,7 +57,7 @@ test('cadastro de cliente permite criar, editar e inativar pela interface', asyn
   scenario,
 }) => {
   await login(page, scenario.adminEmail, scenario.password);
-  await page.goto('/clientes');
+  await page.goto('/cadastros/clientes');
   await page.getByRole('button', { name: 'Novo cliente', exact: true }).click();
   let modal = page.getByRole('dialog', { name: 'Novo cliente' });
   await modal
@@ -107,7 +108,7 @@ test('entrada, saída e insuficiência de estoque mantêm o saldo correto', asyn
   scenario,
 }) => {
   await login(page, scenario.adminEmail, scenario.password);
-  await page.goto('/movimentacoes');
+  await page.goto('/cadastros/movimentacoes');
   for (const [kind, quantity, balance] of [
     ['Entrada', '2', 12],
     ['Saída', '3', 9],
@@ -206,7 +207,7 @@ test('projeto registra checklist, consumo e conclusão sem perder saldo', async 
       response.url().endsWith('/api/projetos') &&
       response.request().method() === 'POST',
   );
-  await modal.getByRole('button', { name: 'Salvar', exact: true }).click();
+  await modal.getByRole('button', { name: 'Criar projeto', exact: true }).click();
   const response = await created;
   expect(response.status()).toBe(201);
   const project = (await response.json()) as { id: number };
@@ -283,6 +284,7 @@ test('financeiro exige desbloqueio, paga despesas, recebe receitas e limpa acess
     .filter({ hasText: `${scenario.prefix} despesa` });
   await expenseRow.getByRole('button', { name: 'Pagar', exact: true }).click();
   await expect(expenseRow.getByText('Pago', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Receitas', exact: true }).click();
   await page.getByRole('button', { name: 'Nova receita', exact: true }).click();
   modal = page.getByRole('dialog', { name: 'Nova receita' });
   await modal
@@ -292,7 +294,6 @@ test('financeiro exige desbloqueio, paga despesas, recebe receitas e limpa acess
   await modal.getByLabel('Vencimento', { exact: true }).fill('2026-10-08');
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click();
   await expect(modal).not.toBeVisible();
-  await page.getByRole('tab', { name: 'Receitas', exact: true }).click();
   const revenueRow = page
     .getByRole('row')
     .filter({ hasText: `${scenario.prefix} receita` });

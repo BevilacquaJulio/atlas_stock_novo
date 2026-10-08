@@ -8,31 +8,33 @@ import {
 const optionalStr = (max: number) =>
   z.string().trim().max(max).optional().nullable();
 
-export const createClienteSchema = z.object({
-  tipo: z.enum(['PF', 'PJ']).default('PF'),
-  nomeCompleto: z.string().trim().min(2).max(200),
-  cpfCnpj: z
-    .string()
-    .transform(onlyDigits)
-    .refine(isValidCpfCnpj, {
+export const createClienteSchema = z
+  .object({
+    tipo: z.enum(['PF', 'PJ']).default('PF'),
+    nomeCompleto: z.string().trim().min(2).max(200),
+    cpfCnpj: z.string().max(30).transform(onlyDigits).refine(isValidCpfCnpj, {
       message: 'CPF/CNPJ inválido.',
     }),
-  telefone: z
-    .string()
-    .transform(onlyDigits)
-    .optional()
-    .nullable(),
-  email: z.string().trim().email().max(180).optional().or(z.literal('')).nullable(),
-  cep: optionalStr(15),
-  rua: optionalStr(200),
-  numero: optionalStr(20),
-  complemento: optionalStr(120),
-  bairro: optionalStr(120),
-  cidade: optionalStr(120),
-  estado: z.string().trim().length(2).optional().or(z.literal('')).nullable(),
-  observacoes: optionalStr(2000),
-  ativo: z.boolean().default(true),
-});
+    telefone: z.string().max(30).transform(onlyDigits).optional().nullable(),
+    email: z
+      .string()
+      .trim()
+      .email()
+      .max(180)
+      .optional()
+      .or(z.literal(''))
+      .nullable(),
+    cep: optionalStr(15),
+    rua: optionalStr(200),
+    numero: optionalStr(20),
+    complemento: optionalStr(120),
+    bairro: optionalStr(120),
+    cidade: optionalStr(120),
+    estado: z.string().trim().length(2).optional().or(z.literal('')).nullable(),
+    observacoes: optionalStr(2000),
+    ativo: z.boolean().default(true),
+  })
+  .strict();
 export class CreateClienteDto extends createZodDto(createClienteSchema) {}
 
 export const updateClienteSchema = createClienteSchema.partial();

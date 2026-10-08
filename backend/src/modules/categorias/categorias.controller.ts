@@ -1,3 +1,4 @@
+import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import {
   Body,
   Controller,
@@ -6,17 +7,13 @@ import {
   HttpCode,
   HttpStatus,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CategoriasService } from './categorias.service';
-import {
-  CreateCategoriaDto,
-  UpdateCategoriaDto,
-} from './dto/categoria.dto';
+import { CreateCategoriaDto, UpdateCategoriaDto } from './dto/categoria.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 
@@ -32,7 +29,7 @@ export class CategoriasController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParseIdPipe) id: number) {
     return this.service.findOne(id);
   }
 
@@ -43,7 +40,7 @@ export class CategoriasController {
 
   @Patch(':id')
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateCategoriaDto,
   ) {
     return this.service.update(id, dto);
@@ -52,7 +49,7 @@ export class CategoriasController {
   @Delete(':id')
   @Roles('ADMINISTRADOR', 'GERENTE')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id', ParseIdPipe) id: number) {
     return this.service.remove(id);
   }
 }

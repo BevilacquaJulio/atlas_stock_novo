@@ -1,25 +1,44 @@
+import {
+  idSchema,
+  moneySchema,
+  quantitySchema,
+  MAX_MONEY,
+} from '../../../common/validators/bounds';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
-export const createMovimentacaoSchema = z.object({
-  produtoId: z.coerce.number().int().positive(),
-  tipo: z.enum(['ENTRADA', 'SAIDA']),
-  quantidade: z.coerce.number().positive(),
-  custoUnitario: z.coerce.number().min(0).optional(),
-  motivo: z.string().trim().max(200).optional().nullable(),
-});
+export const createMovimentacaoSchema = z
+  .object({
+    produtoId: idSchema,
+    tipo: z.enum(['ENTRADA', 'SAIDA']),
+    quantidade: quantitySchema.positive(),
+    custoUnitario: moneySchema.optional(),
+    motivo: z.string().trim().max(200).optional().nullable(),
+  })
+  .strict()
+  .refine(
+    (movimento) =>
+      movimento.custoUnitario === undefined ||
+      movimento.quantidade * movimento.custoUnitario <= MAX_MONEY,
+    {
+      message: 'Valor da movimentação excede o limite permitido.',
+      path: ['custoUnitario'],
+    },
+  );
 export class CreateMovimentacaoDto extends createZodDto(
   createMovimentacaoSchema,
 ) {}
 
 export type CreateMovimentacaoInput = z.infer<typeof createMovimentacaoSchema>;
 
-export const movimentacaoQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  produtoId: z.coerce.number().int().positive().optional(),
-  tipo: z.enum(['ENTRADA', 'SAIDA']).optional(),
-});
+export const movimentacaoQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).max(100_000).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    produtoId: idSchema.optional(),
+    tipo: z.enum(['ENTRADA', 'SAIDA']).optional(),
+  })
+  .strict();
 export class MovimentacaoQueryDto extends createZodDto(
   movimentacaoQuerySchema,
 ) {}

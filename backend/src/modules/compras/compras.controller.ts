@@ -1,9 +1,9 @@
+import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import {
   Body,
   Controller,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -30,21 +30,18 @@ export class ComprasController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParseIdPipe) id: number) {
     return this.service.findOne(id);
   }
 
   @Post()
-  create(
-    @Body() dto: CreateCompraDto,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  create(@Body() dto: CreateCompraDto, @CurrentUser() user: AuthenticatedUser) {
     return this.service.create(dto, user.id);
   }
 
   @Patch(':id/pagar')
   pagar(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: PagarCompraDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -53,7 +50,7 @@ export class ComprasController {
 
   @Patch(':id/confirmar')
   confirmar(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.service.confirmar(id, user.id);
@@ -61,19 +58,19 @@ export class ComprasController {
 
   @Patch(':id/desconfirmar')
   desconfirmar(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.service.desconfirmar(id, user.id);
   }
 
   @Patch(':id/estornar-pagamento')
-  estornarPagamento(@Param('id', ParseIntPipe) id: number) {
+  estornarPagamento(@Param('id', ParseIdPipe) id: number) {
     return this.service.estornarPagamento(id);
   }
 
   @Patch(':id/cancelar')
-  cancelar(@Param('id', ParseIntPipe) id: number) {
+  cancelar(@Param('id', ParseIdPipe) id: number) {
     return this.service.cancelar(id);
   }
 }

@@ -1,5 +1,13 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto, RefreshDto } from './dto/auth.dto';
 import { Public } from '../../common/decorators/public.decorator';
@@ -13,6 +21,7 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
     return this.service.login(dto.email, dto.senha);
@@ -20,6 +29,7 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   refresh(@Body() dto: RefreshDto) {
     return this.service.refresh(dto.refreshToken);

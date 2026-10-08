@@ -3,6 +3,7 @@ import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import * as bcrypt from 'bcryptjs';
 import { PrismaClient } from '../generated/prisma/client';
 import { buildDatabaseConfig } from '../src/config/database-url';
+import { newPasswordSchema } from '../src/common/validators/bounds';
 
 function requireSeedEnv(name: string, minLength = 1): string {
   const value = process.env[name]?.trim();
@@ -17,8 +18,12 @@ function requireSeedEnv(name: string, minLength = 1): string {
 }
 
 const adminEmail = requireSeedEnv('SEED_ADMIN_EMAIL');
-const adminSenha = requireSeedEnv('SEED_ADMIN_PASSWORD', 12);
-const financeiroSenha = requireSeedEnv('SEED_FINANCEIRO_SENHA', 12);
+const adminSenha = newPasswordSchema.parse(
+  requireSeedEnv('SEED_ADMIN_PASSWORD', 12),
+);
+const financeiroSenha = newPasswordSchema.parse(
+  requireSeedEnv('SEED_FINANCEIRO_SENHA', 12),
+);
 
 const prisma = new PrismaClient({
   adapter: new PrismaMariaDb(buildDatabaseConfig()),
@@ -46,7 +51,12 @@ async function main(): Promise<void> {
     });
   }
 
-  const categoriasDespesa = ['Operacional', 'Materiais', 'Salários', 'Impostos'];
+  const categoriasDespesa = [
+    'Operacional',
+    'Materiais',
+    'Salários',
+    'Impostos',
+  ];
   for (const nome of categoriasDespesa) {
     await prisma.categoriaDespesa.upsert({
       where: { nome },

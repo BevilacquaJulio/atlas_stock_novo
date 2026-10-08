@@ -1,14 +1,15 @@
+import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import {
   Body,
   Controller,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { FinanceiroService } from './financeiro.service';
 import {
   CreateCategoriaDespesaDto,
@@ -37,6 +38,7 @@ export class FinanceiroController {
   }
 
   @Post('desbloquear')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   desbloquear(
     @Body() dto: DesbloquearDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -58,7 +60,7 @@ export class FinanceiroController {
 
   @Get('despesas/:id')
   @FinanceiroUnlock()
-  findDespesa(@Param('id', ParseIntPipe) id: number) {
+  findDespesa(@Param('id', ParseIdPipe) id: number) {
     return this.service.findDespesa(id);
   }
 
@@ -71,7 +73,7 @@ export class FinanceiroController {
   @Patch('despesas/:id')
   @FinanceiroUnlock()
   updateDespesa(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateDespesaDto,
   ) {
     return this.service.updateDespesa(id, dto);
@@ -80,7 +82,7 @@ export class FinanceiroController {
   @Patch('despesas/:id/pagar')
   @FinanceiroUnlock()
   pagarDespesa(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: PagarDespesaDto,
   ) {
     return this.service.pagarDespesa(id, dto.dataPagamento);
@@ -94,7 +96,7 @@ export class FinanceiroController {
 
   @Get('receitas/:id')
   @FinanceiroUnlock()
-  findReceita(@Param('id', ParseIntPipe) id: number) {
+  findReceita(@Param('id', ParseIdPipe) id: number) {
     return this.service.findReceita(id);
   }
 
@@ -107,7 +109,7 @@ export class FinanceiroController {
   @Patch('receitas/:id')
   @FinanceiroUnlock()
   updateReceita(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateReceitaDto,
   ) {
     return this.service.updateReceita(id, dto);
@@ -116,7 +118,7 @@ export class FinanceiroController {
   @Patch('receitas/:id/receber')
   @FinanceiroUnlock()
   receberReceita(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: ReceberReceitaDto,
   ) {
     return this.service.receberReceita(id, dto.dataRecebimento);

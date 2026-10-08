@@ -52,6 +52,9 @@ temp/
 # -----------------------------------------------------------------------------
 coverage/
 .vitest-cache/
+playwright-report/
+test-results/
+.scannerwork/
 
 # -----------------------------------------------------------------------------
 # Banco de dados — dumps e backups (nunca versionar dados reais)

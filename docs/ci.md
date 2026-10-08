@@ -40,9 +40,9 @@ e não são contabilizados artificialmente nessa cobertura.
 
 Configuração externa necessária:
 
-1. Em [Secrets de Actions](https://github.com/BevilacquaJulio/atlas_stock_novo/settings/secrets/actions), cadastrar `SONAR_TOKEN` com permissão de análise nesse projeto. Não versionar nem enviar o valor pelo chat.
+1. Em SonarCloud, avatar → My account → Access Tokens → Personal Tokens, gerar um token da conta com permissão de análise nesse projeto. Em [Secrets de Actions](https://github.com/BevilacquaJulio/atlas_stock_novo/settings/secrets/actions), cadastrar o valor como `SONAR_TOKEN`. Não versionar nem enviar o valor pelo chat.
 2. No [projeto SonarCloud](https://sonarcloud.io/dashboard?id=BevilacquaJulio_atlas_stock_novo), em Administration → Analysis Method, desativar Automatic Analysis antes do primeiro scan de CI. Análise automática não consome o LCOV enviado pelo workflow.
-3. Em Administration → Quality Gate, desativar “Ignore duplication and coverage on small changes”. O workflow exige a configuração efetiva `sonar.qualitygate.ignoreSmallChanges=false`.
+3. Na seção Quality Gate do projeto, desativar “Ignore duplication and coverage on small changes”. O workflow resolve o ID real pela API v2 `/projects/projects` e exige `ignoreSmallChanges=false` em `/quality-gates/settings`, com `resourceType=PROJECT`. A chave legada `sonar.qualitygate.ignoreSmallChanges` não representa essa configuração do Cloud.
 4. Manter uma condição `new_coverage < 80` (ou mais rigorosa). O gate atual “Sonar way” tem 80%, confirmado pela API. O workflow também confere a condição antes de analisar.
 5. Confirmar análise de PR e comparação com `main`. O gate não calculado não significa aprovação; o scanner aguarda o resultado.
 
@@ -177,5 +177,6 @@ PR deve comprovar as seis jornadas, sem retries ou casos ignorados.
 Fontes oficiais consultadas:
 [GitHub merge protection](https://docs.github.com/en/code-security/concepts/code-scanning/merge-protection),
 [SonarCloud com Actions](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/github-actions-for-sonarcloud),
+[API do SonarCloud](https://docs.sonarsource.com/sonarqube-cloud/appendices/web-api),
 [Vitest coverage](https://vitest.dev/guide/coverage.html),
 [Playwright web server](https://playwright.dev/docs/test-webserver).

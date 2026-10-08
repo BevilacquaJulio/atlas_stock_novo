@@ -228,11 +228,17 @@ jobs:
         run: |
           curl --fail --silent --show-error --get \
             --header "Authorization: Bearer $SONAR_TOKEN" \
-            --data-urlencode 'component=BevilacquaJulio_atlas_stock_novo' \
-            --data-urlencode 'keys=sonar.qualitygate.ignoreSmallChanges' \
+            --data-urlencode 'keys=BevilacquaJulio_atlas_stock_novo' \
+            --output "$RUNNER_TEMP/sonar-project.json" \
+            'https://api.sonarcloud.io/projects/projects'
+          project_id=$(jq -er '.projects[] | select(.key == "BevilacquaJulio_atlas_stock_novo") | .id' "$RUNNER_TEMP/sonar-project.json")
+          curl --fail --silent --show-error --get \
+            --header "Authorization: Bearer $SONAR_TOKEN" \
+            --data-urlencode "resourceId=$project_id" \
+            --data-urlencode 'resourceType=PROJECT' \
             --output "$RUNNER_TEMP/sonar-settings.json" \
-            'https://sonarcloud.io/api/settings/values'
-          jq -e '.settings | any(.key == "sonar.qualitygate.ignoreSmallChanges" and .value == "false")' "$RUNNER_TEMP/sonar-settings.json" \
+            'https://api.sonarcloud.io/quality-gates/settings'
+          jq -e --arg project_id "$project_id" '.resourceId == $project_id and .resourceType == "PROJECT" and .ignoreSmallChanges == false' "$RUNNER_TEMP/sonar-settings.json" \
             || { echo '::error::Disable Ignore duplication and coverage on small changes in SonarCloud.'; exit 1; }
           curl --fail --silent --show-error --get \
             --header "Authorization: Bearer $SONAR_TOKEN" \

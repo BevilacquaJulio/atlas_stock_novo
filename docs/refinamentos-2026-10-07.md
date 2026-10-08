@@ -209,8 +209,14 @@ Triagem e próximos passos:
   Sem trust proxy, o throttle agrupa clientes pelo IP do proxy; os novos limites
   sensíveis são 10/min no login/desbloqueio e 30/min no refresh. Nunca confiar
   indiscriminadamente em X-Forwarded-For. O teste HTTP usa acesso direto.
-- Não existe workflow CI versionado. Adicionar lint sem --fix, typecheck,
-  testes HTTP/MySQL, build, análise de dependências e proteção de branch.
+- CI começou a ser implementada em 08/10/2026 na branch
+  `feat/ci-validacao-prs`, por solicitação posterior, no
+  [PR #7](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/7).
+  Proteção de main aplicada; integração MySQL e CodeQL aprovados no GitHub.
+  Configuração, E2E,
+  critérios e integrações externas estão em [ci.md](ci.md). O restante de
+  dependências/infraestrutura continua reservado; nenhum bloqueio de audit
+  será omitido para permitir merge.
 - Cobertura inicial: 28 testes backend e 4 frontend; não há teste HTTP/MySQL.
   Os testes novos reduzem lacunas, mas não substituem jornadas de navegador,
   HTTPS/Traefik, acessibilidade, erros offline e smoke de produção.

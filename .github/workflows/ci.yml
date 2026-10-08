@@ -242,7 +242,7 @@ jobs:
               jq -r '.message // .error // "No API error message available."' "$RUNNER_TEMP/sonar-project.json"
               exit 1
             }
-          project_id=$(jq -er '.projects[] | select(.key == "BevilacquaJulio_atlas_stock_novo") | .id' "$RUNNER_TEMP/sonar-project.json")
+          project_id=$(jq -er '.projects[] | select(.key == "BevilacquaJulio_atlas_stock_novo") | .legacyId' "$RUNNER_TEMP/sonar-project.json")
           echo 'Checking the project small-change policy through SonarCloud API v2.'
           curl --fail-with-body --silent --show-error --get \
             --header "Authorization: Bearer $SONAR_TOKEN" \

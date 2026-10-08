@@ -40,17 +40,17 @@ e não são contabilizados artificialmente nessa cobertura.
 
 Configuração externa necessária:
 
-1. Em SonarCloud, avatar → My account → Access Tokens → Personal Tokens, gerar um token da conta com permissão de análise nesse projeto. Em Administration → Permissions do projeto, essa conta precisa de Execute Analysis para enviar análises e Administer para a consulta às configurações do Quality Gate feita pelo workflow. Em [Secrets de Actions](https://github.com/BevilacquaJulio/atlas_stock_novo/settings/secrets/actions), cadastrar o valor como `SONAR_TOKEN`. Não versionar nem enviar o valor pelo chat.
+1. Em SonarCloud, avatar → My account → Access Tokens → Personal Tokens, gerar um token da conta com Execute Analysis nesse projeto (Administration → Permissions). A conta que configura o projeto precisa de Administer para alterar suas configurações. Em [Secrets de Actions](https://github.com/BevilacquaJulio/atlas_stock_novo/settings/secrets/actions), cadastrar o valor como `SONAR_TOKEN`. Não versionar nem enviar o valor pelo chat.
 2. No [projeto SonarCloud](https://sonarcloud.io/dashboard?id=BevilacquaJulio_atlas_stock_novo), em Administration → Analysis Method, desativar Automatic Analysis antes do primeiro scan de CI. Análise automática não consome o LCOV enviado pelo workflow.
-3. Na seção Quality Gate do projeto, desativar “Ignore duplication and coverage on small changes”. O workflow resolve o ID real pela API v2 `/projects/projects` e exige `ignoreSmallChanges=false` em `/quality-gates/settings`, com `resourceType=PROJECT`. A chave legada `sonar.qualitygate.ignoreSmallChanges` não representa essa configuração do Cloud.
+3. Na seção Quality Gate do projeto, desativar “Ignore duplication and coverage on small changes”. O workflow resolve `legacyId` pela API v2 `/projects/projects` e exige `ignoreSmallChanges=false` em `/quality-gates/settings`, com `resourceType=PROJECT`. Esse endpoint de configurações usa o ID legado também usado pela interface, e não o UUID v4 do campo `id`. A chave legada `sonar.qualitygate.ignoreSmallChanges` não representa essa configuração do Cloud.
 4. Manter uma condição `new_coverage < 80` (ou mais rigorosa). O gate atual “Sonar way” tem 80%, confirmado pela API. O workflow também confere a condição antes de analisar.
 5. Confirmar análise de PR e comparação com `main`. O gate não calculado não significa aprovação; o scanner aguarda o resultado.
 
 Nenhuma variable GitHub é exigida; projeto e organização estão versionados.
 O workflow valida a autenticação antes de consultar configurações. Token
 rejeitado exige conferir valor, expiração e região; HTTP 403 na consulta
-`/quality-gates/settings` exige conferir as permissões da conta que emitiu
-o token. A consulta ao projeto público sozinha não comprova essas permissões.
+`/quality-gates/settings` exige conferir o ID legado e as permissões da conta
+que emitiu o token. A consulta ao projeto público sozinha não comprova essas permissões.
 Forks sem `SONAR_TOKEN` falham explicitamente nesse check. Não se usa
 `pull_request_target` para expor o secret ao código do fork. A análise de
 Actions só deve começar depois de desligar a análise automática, evitando
@@ -179,8 +179,9 @@ ajustados às rotas, botões, listboxes e abas existentes. A
 [execução da revisão 7081088](https://github.com/BevilacquaJulio/atlas_stock_novo/actions/runs/37727264481)
 aprovou os 87 testes, incluindo as seis jornadas E2E sem retries ou casos
 ignorados. Após cadastrar o token, a consulta das configurações do Quality
-Gate retornou HTTP 403 por privilégios insuficientes; essa falha não foi
-convertida em aprovação nem o check removido.
+Gate retornou HTTP 403. A consulta enviava o UUID v4 a um endpoint que exige
+o ID legado; foi corrigida para usar `legacyId`. Essa falha não foi convertida
+em aprovação nem o check removido.
 
 Fontes oficiais consultadas:
 [GitHub merge protection](https://docs.github.com/en/code-security/concepts/code-scanning/merge-protection),

@@ -226,18 +226,28 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          curl --fail --silent --show-error --get \
+          echo 'Resolving the project through SonarCloud API v2.'
+          curl --fail-with-body --silent --show-error --get \
             --header "Authorization: Bearer $SONAR_TOKEN" \
             --data-urlencode 'keys=BevilacquaJulio_atlas_stock_novo' \
             --output "$RUNNER_TEMP/sonar-project.json" \
-            'https://api.sonarcloud.io/projects/projects'
+            'https://api.sonarcloud.io/projects/projects' || {
+              echo '::error::SonarCloud project lookup failed. Check token authentication and project access.'
+              jq -r '.message // .error // "No API error message available."' "$RUNNER_TEMP/sonar-project.json"
+              exit 1
+            }
           project_id=$(jq -er '.projects[] | select(.key == "BevilacquaJulio_atlas_stock_novo") | .id' "$RUNNER_TEMP/sonar-project.json")
-          curl --fail --silent --show-error --get \
+          echo 'Checking the project small-change policy through SonarCloud API v2.'
+          curl --fail-with-body --silent --show-error --get \
             --header "Authorization: Bearer $SONAR_TOKEN" \
             --data-urlencode "resourceId=$project_id" \
             --data-urlencode 'resourceType=PROJECT' \
             --output "$RUNNER_TEMP/sonar-settings.json" \
-            'https://api.sonarcloud.io/quality-gates/settings'
+            'https://api.sonarcloud.io/quality-gates/settings' || {
+              echo '::error::SonarCloud Quality Gate settings lookup failed. Check token permissions.'
+              jq -r '.message // .error // "No API error message available."' "$RUNNER_TEMP/sonar-settings.json"
+              exit 1
+            }
           jq -e --arg project_id "$project_id" '.resourceId == $project_id and .resourceType == "PROJECT" and .ignoreSmallChanges == false' "$RUNNER_TEMP/sonar-settings.json" \
             || { echo '::error::Disable Ignore duplication and coverage on small changes in SonarCloud.'; exit 1; }
           curl --fail --silent --show-error --get \

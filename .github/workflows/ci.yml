@@ -218,6 +218,12 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           test -n "$SONAR_TOKEN" || { echo '::error::Configure SONAR_TOKEN and disable Automatic Analysis in SonarCloud.'; exit 1; }
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer $SONAR_TOKEN" \
+            --output "$RUNNER_TEMP/sonar-authentication.json" \
+            'https://sonarcloud.io/api/authentication/validate'
+          jq -e '.valid == true' "$RUNNER_TEMP/sonar-authentication.json" \
+            || { echo '::error::SONAR_TOKEN was rejected by SonarCloud. Check its value, expiration and region.'; exit 1; }
           test -s backend/coverage/lcov.info
           test -s frontend/coverage/lcov.info
           sed -i 's|^SF:|SF:backend/|' backend/coverage/lcov.info

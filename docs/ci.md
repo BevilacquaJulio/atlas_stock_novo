@@ -148,12 +148,32 @@ real com **17,98%** de linhas. Frontend: 13 testes, tipos e build aprovados;
 LCOV com **5,49%** de linhas. Lint frontend tem dois avisos anteriores, zero
 erros. O coverage provider tem a mesma versão do Vitest existente (3.2.7).
 
-Auditoria de produção consultada em 08/10/2026: backend tem 17 entradas
-(1 crítica, 10 altas e 6 moderadas); frontend tem 3 altas. Incluem dependências
-transitivas/metavulnerabilidades. O check vai falhar enquanto houver High ou
-Critical. Não foram atualizadas dependências de produção nem rebaixado Prisma
-para 6 para contornar o audit. O pacote `prisma`, embora declarado dev, aparece
+Auditoria de produção inicial em 08/10/2026: backend tinha 17 entradas
+(1 crítica, 10 altas e 6 moderadas); frontend tinha 3 altas. Incluíam dependências
+transitivas/metavulnerabilidades. O check falha enquanto houver High ou
+Critical. Naquela etapa, as dependências de produção ainda não haviam sido
+atualizadas. O pacote `prisma`, embora declarado dev, aparece
 no grafo auditado devido a relações de dependências; não será ignorado.
+
+### Correção das auditorias de produção
+
+Os lockfiles foram atualizados e `npm audit --omit=dev --audit-level=high`
+passou com zero vulnerabilidades nas duas aplicações. Axios está em 1.20.0,
+React Router em 7.18.4 e Prisma CLI/Client/adapter em 7.10.0. O limiar da CI
+permanece inalterado; `CI Required` continua exigindo sucesso das auditorias.
+
+Os overrides em `backend/package.json` corrigem versões transitivas fixadas
+pelos pacotes de origem: `mariadb` 3.5.4 no adapter, `mysql2` 3.24.5 na CLI,
+`deepmerge-ts` 8.0.2 no config e `js-yaml` 5.4.1 no Swagger. Reavaliar esses
+overrides quando os respectivos pacotes adotarem versões corrigidas.
+O [deepmerge-ts 8](https://github.com/RebeccaStevens/deepmerge-ts/releases/tag/v8.0.0)
+altera a mesclagem de Maps; a configuração Prisma deste projeto usa objetos
+simples, e o carregamento da configuração e a geração do cliente foram testados.
+
+Validação local após `npm ci`: lint, tipos, build e testes com cobertura nas
+duas aplicações. Integração MySQL e E2E devem rodar novamente na CI após o
+envio das alterações; o Docker local está indisponível. A auditoria citada
+cobre produção, não significa ausência de alertas em dependências de desenvolvimento.
 
 Na inspeção inicial não havia `SONAR_TOKEN`, proteção de main ou default
 setup CodeQL. Sonar automático existia. Integração Sonar via Actions e a

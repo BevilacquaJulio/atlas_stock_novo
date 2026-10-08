@@ -27,7 +27,11 @@ describe('logs HTTP sem dados sensíveis', () => {
       });
       app.use(pinoHttp(httpLoggingOptions, stream));
       app.post('/probe', (_req, res) => {
-        res.setHeader('Set-Cookie', 'secret-cookie');
+        res.cookie('session', 'secret-cookie', {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+        });
         res.status(201).json({ ok: true });
       });
       const response = await request(app)

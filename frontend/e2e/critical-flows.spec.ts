@@ -156,7 +156,9 @@ test('compra passa por pagamento, recebimento, estornos e cancelamento com despe
       response.url().endsWith('/api/compras') &&
       response.request().method() === 'POST',
   );
-  await modal.getByRole('button', { name: 'Salvar', exact: true }).click();
+  await modal
+    .getByRole('button', { name: 'Registrar compra', exact: true })
+    .click();
   const response = await created;
   expect(response.status()).toBe(201);
   const purchase = (await response.json()) as { id: number };
@@ -228,9 +230,10 @@ test('projeto registra checklist, consumo e conclusão sem perder saldo', async 
     .fill('Verificar montagem');
   await modal.getByRole('button', { name: 'Adicionar', exact: true }).click();
   await expect(modal).not.toBeVisible();
+  // O checkbox controlado atualiza o estado após a confirmação da API.
   await page
     .getByRole('checkbox', { name: 'Marcar Verificar montagem' })
-    .check();
+    .click();
   await expect(
     page.getByRole('checkbox', { name: 'Marcar Verificar montagem' }),
   ).toBeChecked();

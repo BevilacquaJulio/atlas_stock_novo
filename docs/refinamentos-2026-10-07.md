@@ -232,6 +232,9 @@ do sandbox. Resultado final: **44 testes unitários backend + 24 HTTP/MySQL +
 13 frontend = 81 testes aprovados**. Builds backend/frontend, typecheck dos
 testes e lint da API aprovados; lint frontend sem erros, com os dois avisos
 registrados acima. `git diff --check` aprovado. Sem migrations novas.
+Compose validado com `docker compose --env-file .env.example config
+--no-env-resolution --quiet`, sem ler arquivos locais de segredos ou subir
+serviços. A validação não confirma TLS, redes externas ou deploy.
 
 Tópico 2: 32 testes unitários, 4 cenários reais em MySQL 8.4 descartável
 (`127.0.0.1:13316/atlas_audit_test`), lint dos arquivos de autenticação e build
@@ -291,7 +294,7 @@ validação. API real de produção, HTTPS e imagens finais não foram testados.
 | 3 | [Preserva estoque e status](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/3) | `7939b58` |
 | 4 | [Corrige pagamentos e recebimentos](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/4) | `d5e4ccb`, `2aba9bb` |
 | 5 | [Isola sessões e cache](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/5) | `0d6df08` |
-| 6 | Branch `feat/validacao-http-segura`; PR após validação | Histórico da branch |
+| 6 | [Reforça validação, limites HTTP e logs](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/6) | `ffaace5` |
 
 PRs publicados pela conta autenticada `BevilacquaJulio`, com títulos e
 descrições normais e commits atribuídos a Julio. Os tópicos 7 e 8 continuam

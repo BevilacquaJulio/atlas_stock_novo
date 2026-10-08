@@ -6,6 +6,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import { validateEnv } from './config/env.validation';
+import { httpLoggingOptions } from './config/http-logging';
 import { PrismaModule } from './prisma/prisma.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -37,7 +38,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
           process.env.NODE_ENV !== 'production'
             ? { target: 'pino-pretty', options: { singleLine: true } }
             : undefined,
-        redact: ['req.headers.authorization'],
+        ...httpLoggingOptions,
       },
     }),
     ThrottlerModule.forRoot([

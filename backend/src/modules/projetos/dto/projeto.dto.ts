@@ -1,3 +1,9 @@
+import {
+  idSchema,
+  moneySchema,
+  quantitySchema,
+  MAX_MONEY,
+} from '../../../common/validators/bounds';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
@@ -8,28 +14,37 @@ const projetoStatusSchema = z.enum([
   'CANCELADO',
 ]);
 
-export const createProjetoSchema = z.object({
-  clienteId: z.coerce.number().int().positive(),
-  veiculoId: z.coerce.number().int().positive(),
-  descricao: z.string().trim().max(2000).optional().nullable(),
-  valorOrcado: z.coerce.number().min(0).default(0),
-  checklistInicial: z.array(z.string().trim().min(1).max(300)).optional(),
-});
+export const createProjetoSchema = z
+  .object({
+    clienteId: idSchema,
+    veiculoId: idSchema,
+    descricao: z.string().trim().max(2000).optional().nullable(),
+    valorOrcado: moneySchema.default(0),
+    checklistInicial: z
+      .array(z.string().trim().min(1).max(300))
+      .max(100)
+      .optional(),
+  })
+  .strict();
 export class CreateProjetoDto extends createZodDto(createProjetoSchema) {}
 export type CreateProjetoInput = z.infer<typeof createProjetoSchema>;
 
-export const updateProjetoSchema = z.object({
-  descricao: z.string().trim().max(2000).optional().nullable(),
-  valorOrcado: z.coerce.number().min(0).optional(),
-  valorFinal: z.coerce.number().min(0).optional().nullable(),
-});
+export const updateProjetoSchema = z
+  .object({
+    descricao: z.string().trim().max(2000).optional().nullable(),
+    valorOrcado: moneySchema.optional(),
+    valorFinal: moneySchema.optional().nullable(),
+  })
+  .strict();
 export class UpdateProjetoDto extends createZodDto(updateProjetoSchema) {}
 export type UpdateProjetoInput = z.infer<typeof updateProjetoSchema>;
 
-export const alterarStatusProjetoSchema = z.object({
-  status: projetoStatusSchema,
-  observacao: z.string().trim().max(2000).optional().nullable(),
-});
+export const alterarStatusProjetoSchema = z
+  .object({
+    status: projetoStatusSchema,
+    observacao: z.string().trim().max(2000).optional().nullable(),
+  })
+  .strict();
 export class AlterarStatusProjetoDto extends createZodDto(
   alterarStatusProjetoSchema,
 ) {}
@@ -37,20 +52,26 @@ export type AlterarStatusProjetoInput = z.infer<
   typeof alterarStatusProjetoSchema
 >;
 
-export const createChecklistItemSchema = z.object({
-  descricao: z.string().trim().min(1).max(300),
-  ordem: z.coerce.number().int().min(0).optional(),
-});
+export const createChecklistItemSchema = z
+  .object({
+    descricao: z.string().trim().min(1).max(300),
+    ordem: z.coerce.number().int().min(0).max(100_000).optional(),
+  })
+  .strict();
 export class CreateChecklistItemDto extends createZodDto(
   createChecklistItemSchema,
 ) {}
-export type CreateChecklistItemInput = z.infer<typeof createChecklistItemSchema>;
+export type CreateChecklistItemInput = z.infer<
+  typeof createChecklistItemSchema
+>;
 
-export const updateChecklistItemSchema = z.object({
-  descricao: z.string().trim().min(1).max(300).optional(),
-  concluido: z.boolean().optional(),
-  ordem: z.coerce.number().int().min(0).optional(),
-});
+export const updateChecklistItemSchema = z
+  .object({
+    descricao: z.string().trim().min(1).max(300).optional(),
+    concluido: z.boolean().optional(),
+    ordem: z.coerce.number().int().min(0).max(100_000).optional(),
+  })
+  .strict();
 export class UpdateChecklistItemDto extends createZodDto(
   updateChecklistItemSchema,
 ) {}
@@ -61,11 +82,19 @@ export type UpdateChecklistItemInput = z.infer<
 export const createConsumoSchema = z
   .object({
     tipo: z.enum(['PRODUTO', 'SERVICO']),
-    produtoId: z.coerce.number().int().positive().optional(),
+    produtoId: idSchema.optional(),
     descricao: z.string().trim().max(200).optional().nullable(),
-    quantidade: z.coerce.number().positive(),
-    valorUnitario: z.coerce.number().min(0),
+    quantidade: quantitySchema.positive(),
+    valorUnitario: moneySchema,
   })
+  .strict()
+  .refine(
+    (consumo) => consumo.quantidade * consumo.valorUnitario <= MAX_MONEY,
+    {
+      message: 'Valor do consumo excede o limite permitido.',
+      path: ['valorUnitario'],
+    },
+  )
   .refine(
     (d) =>
       d.tipo === 'SERVICO'
@@ -80,16 +109,18 @@ export const createConsumoSchema = z
 export class CreateConsumoDto extends createZodDto(createConsumoSchema) {}
 export type CreateConsumoInput = z.infer<typeof createConsumoSchema>;
 
-export const projetoQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().trim().optional(),
-  status: projetoStatusSchema.optional(),
-  clienteId: z.coerce.number().int().positive().optional(),
-  ativo: z
-    .enum(['true', 'false'])
-    .transform((v) => v === 'true')
-    .optional(),
-});
+export const projetoQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).max(100_000).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    search: z.string().trim().max(200).optional(),
+    status: projetoStatusSchema.optional(),
+    clienteId: idSchema.optional(),
+    ativo: z
+      .enum(['true', 'false'])
+      .transform((v) => v === 'true')
+      .optional(),
+  })
+  .strict();
 export class ProjetoQueryDto extends createZodDto(projetoQuerySchema) {}
 export type ProjetoQuery = z.infer<typeof projetoQuerySchema>;

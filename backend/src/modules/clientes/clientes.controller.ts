@@ -1,3 +1,4 @@
+import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import {
   Body,
   Controller,
@@ -6,7 +7,6 @@ import {
   HttpCode,
   HttpStatus,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -29,7 +29,7 @@ export class ClientesController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParseIdPipe) id: number) {
     return this.service.findOne(id);
   }
 
@@ -39,17 +39,14 @@ export class ClientesController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateClienteDto,
-  ) {
+  update(@Param('id', ParseIdPipe) id: number, @Body() dto: UpdateClienteDto) {
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
   @Roles('ADMINISTRADOR', 'GERENTE')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  async remove(@Param('id', ParseIdPipe) id: number): Promise<void> {
     await this.service.remove(id);
   }
 }

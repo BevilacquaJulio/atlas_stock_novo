@@ -13,15 +13,11 @@ interface ErrorEnvelope {
   error: {
     code: string;
     message: string;
+    requestId?: string | number;
     details?: unknown;
   };
 }
 
-/**
- * Filtro global de exceções. Padroniza toda resposta de erro no formato:
- *   { error: { code, message, details? } }
- * Nunca expõe stack trace ou detalhes internos ao cliente.
- */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -32,12 +28,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     const { status, body } = this.buildError(exception);
+    body.error.requestId =
+      typeof request.id === 'string' || typeof request.id === 'number'
+        ? request.id
+        : undefined;
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      this.logger.error(
-        `${request.method} ${request.url} -> ${status}`,
-        exception instanceof Error ? exception.stack : String(exception),
-      );
+      this.logger.error({
+        event: 'request_failed',
+        requestId: request.id,
+        status,
+      });
     }
 
     response.status(status).json(body);
@@ -47,7 +48,33 @@ export class AllExceptionsFilter implements ExceptionFilter {
     status: number;
     body: ErrorEnvelope;
   } {
-    // Erros de validação Zod (nestjs-zod) -> 422 com detalhes dos campos
+    const parserError = exception as {
+      type?: unknown;
+      status?: unknown;
+    } | null;
+    if (
+      parserError?.type === 'entity.too.large' &&
+      parserError.status === 413
+    ) {
+      return {
+        status: 413,
+        body: {
+          error: {
+            code: 'PAYLOAD_TOO_LARGE',
+            message: 'Requisição excede o limite de 100 KB.',
+          },
+        },
+      };
+    }
+    if (
+      parserError?.type === 'entity.parse.failed' &&
+      parserError.status === 400
+    ) {
+      return {
+        status: 400,
+        body: { error: { code: 'BAD_REQUEST', message: 'JSON inválido.' } },
+      };
+    }
     if (exception instanceof ZodValidationException) {
       const zodError = exception.getZodError();
       return {
@@ -56,7 +83,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Dados inválidos.',
-            details: zodError.issues,
+            details: zodError.issues.map((issue) => ({
+              path: issue.path,
+              code: issue.code,
+              message:
+                issue.code === 'unrecognized_keys'
+                  ? 'Campos não permitidos.'
+                  : 'Valor inválido para este campo.',
+            })),
           },
         },
       };
@@ -64,12 +98,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
+      if (status >= 500) {
+        return {
+          status,
+          body: {
+            error: {
+              code: status === 503 ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_ERROR',
+              message: 'Serviço indisponível.',
+            },
+          },
+        };
+      }
       const res = exception.getResponse();
       const message =
         typeof res === 'string'
           ? res
-          : ((res as Record<string, unknown>)?.message as string) ??
-            exception.message;
+          : (((res as Record<string, unknown>)?.message as string) ??
+            exception.message);
       return {
         status,
         body: {
@@ -99,6 +144,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       [HttpStatus.FORBIDDEN]: 'FORBIDDEN',
       [HttpStatus.NOT_FOUND]: 'NOT_FOUND',
       [HttpStatus.CONFLICT]: 'CONFLICT',
+      [HttpStatus.TOO_MANY_REQUESTS]: 'RATE_LIMITED',
       [HttpStatus.UNPROCESSABLE_ENTITY]: 'VALIDATION_ERROR',
     };
     return map[status] ?? 'ERROR';

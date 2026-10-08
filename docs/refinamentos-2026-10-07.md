@@ -10,9 +10,9 @@ Dockerfiles, Compose e Nginx. O sistema usa um banco global de uma empresa;
 não há modelo de tenant. A ausência de tenant não foi classificada como IDOR
 sem uma regra de produto que exija múltiplas empresas.
 
-O usuário autorizou alterações, branches por implementação, commits e pushes.
-As branches são encadeadas: cada uma parte da anterior; a última contém todo
-o trabalho. Não há autorização de deploy ou alteração de dados de produção.
+Alterações, branches por implementação, commits, pushes, PRs e merges foram
+autorizados. As branches são encadeadas e integradas sequencialmente em `main`
+por merge commit. Não houve deploy ou alteração de dados de produção.
 Os dois últimos tópicos ficam deliberadamente para discussão conjunta.
 
 Os achados abaixo são confirmados por inspeção, salvo indicação explícita.
@@ -29,7 +29,7 @@ backups ou imagens de produção. Não há garantia de ausência de outras falha
 | 3 | Concorrência de estoque, compras e projetos | Alta | `feat/transacoes-estoque-compras` | Implementado; MySQL, testes e build aprovados |
 | 4 | Consistência dos pagamentos financeiros | Alta | `feat/consistencia-financeiro` | Implementado; MySQL, testes e builds aprovados |
 | 5 | Isolamento das sessões no frontend | Alta | `feat/isolar-sessoes-frontend` | Implementado; 13 testes, lint e build aprovados |
-| 6 | Limites de entrada, logs e configuração HTTP | Média/alta | `feat/validacao-http-segura` | Planejado |
+| 6 | Limites de entrada, logs e configuração HTTP | Média/alta | `feat/validacao-http-segura` | Implementado; HTTP/MySQL, tipos, lint e builds aprovados |
 | 7 | Evolução de sessão, permissões e regras de produto | Alta | A definir juntos | **Reservado** |
 | 8 | Dependências, infraestrutura e qualidade de entrega | Alta | A definir juntos | **Reservado** |
 
@@ -140,18 +140,21 @@ StrictMode e destino externo. Rebuild do `app`; contrato refresh preservado.
 buscas/página sem teto e valores sem faixa/precisão compatível com DECIMAL.
 Só há throttle global de 120/min; logs redigem apenas Authorization e podem
 registrar o token financeiro. Swagger é público também em produção.
-`tsconfig.json` combina CommonJS e resolução bundler; o build existente passa,
-mas a configuração deve ser mantida coerente com a execução Node e seus testes.
+`health/ready` retorna HTTP 200 mesmo com banco indisponível. O runner transpila
+testes sem checar tipos; testes unitários não exercitam o bootstrap real.
 
 **Impacto:** operações caras/overflow, truncamento de senha Unicode, exposição
-de segredo nos logs, superfície de documentação interna e build não confiável.
+de segredo nos logs, superfície de documentação interna e falsa prontidão.
 
 **Ação:** contratos Zod estritos/bounded, limites numéricos e coleções, política
 nova de senha compatível com bcrypt em bytes sem bloquear logins legados,
-throttle sensível, redaction de headers, Swagger só fora de produção,
-bootstrap HTTP compartilhado com testes e configuração TypeScript coerente.
+throttle sensível, logs por allowlist, Swagger só fora de produção,
+bootstrap HTTP comum, erros seguros com request ID e readiness 503.
+Typecheck explícito inclui os testes; integração executa o build real de
+produção, com metadados de DI. A configuração de build existente foi preservada
+e validada, sem classificar CommonJS/bundler como falha de compilação confirmada.
 
-**Regressão:** pipeline HTTP real com fixtures/stubs, payloads grandes/campos
+**Regressão:** pipeline HTTP real com fixtures sintéticas, payloads grandes/campos
 extras, 429, headers e Swagger; schemas e builds. Rebuild da API.
 
 ## 7. Reservado: sessão, permissões e regras de produto
@@ -202,11 +205,18 @@ Triagem e próximos passos:
   hostname antes de exigir verificação. Isolar redes compartilhadas.
 - Habilitar shutdown hooks/stop_grace_period, readiness bounded, orçamento de
   conexões e alertas. Testar imagens finais, não apenas compilação.
+- Definir proxies/redes confiáveis antes de usar IP encaminhado pelo Traefik.
+  Sem trust proxy, o throttle agrupa clientes pelo IP do proxy; os novos limites
+  sensíveis são 10/min no login/desbloqueio e 30/min no refresh. Nunca confiar
+  indiscriminadamente em X-Forwarded-For. O teste HTTP usa acesso direto.
 - Não existe workflow CI versionado. Adicionar lint sem --fix, typecheck,
   testes HTTP/MySQL, build, análise de dependências e proteção de branch.
 - Cobertura inicial: 28 testes backend e 4 frontend; não há teste HTTP/MySQL.
   Os testes novos reduzem lacunas, mas não substituem jornadas de navegador,
   HTTPS/Traefik, acessibilidade, erros offline e smoke de produção.
+- Lint completo do frontend encerra com zero erros e dois avisos preexistentes
+  de dependencies em useEffect de `SelectField.tsx:72` e `SwitchField.tsx:53`.
+  Revisar sincronização com React Hook Form e reset; aviso não comprova loop.
 - README principal contém `web`, mas serviço real se chama `app`, e cita SQL
   não presente no checkout. Documentação operacional pessoal será mantida em
   `readme-ignored.md`, ignorado por Git, com nomes/comandos reais.
@@ -218,7 +228,10 @@ Triagem e próximos passos:
 Baseline: Node 22.16.0, npm 10.9.2; Prisma 7.8.0, Vitest 3.2.7.
 Dependências instaladas pelos lockfiles com `npm ci --ignore-scripts`.
 Testes baseline passam (28 backend/4 frontend) fora da restrição de realpath
-do sandbox. Resultados finais, commits e limitações serão acrescentados aqui.
+do sandbox. Resultado final: **44 testes unitários backend + 24 HTTP/MySQL +
+13 frontend = 81 testes aprovados**. Builds backend/frontend, typecheck dos
+testes e lint da API aprovados; lint frontend sem erros, com os dois avisos
+registrados acima. `git diff --check` aprovado. Sem migrations novas.
 
 Tópico 2: 32 testes unitários, 4 cenários reais em MySQL 8.4 descartável
 (`127.0.0.1:13316/atlas_audit_test`), lint dos arquivos de autenticação e build
@@ -251,6 +264,38 @@ O refresh segue em localStorage até a evolução conjunta do tópico 7.
 
 Tópico 1: 2 testes dos guardas de populate, 4 testes de login e builds de
 backend/frontend aprovados. Nenhuma conexão de banco foi aberta pelo populate.
+
+Tópico 6: schemas estritos recusam campos extras; compras e checklist aceitam
+até 100 itens, busca até 200 caracteres e página até 100.000. IDs positivos
+cabem em INT; valores/quantidades respeitam DECIMAL(12,2)/(12,3), incluindo
+totais e overflow de saldo dentro da transação. Senhas novas/seed exigem
+12 caracteres e no máximo 72 bytes UTF-8; login legado continua aceito.
+Os corpos têm teto explícito de 100 KB. CORS exige origens exatas;
+documentação Swagger fica fora de produção. Logs omitem headers, cookies,
+query, corpo e mensagens internas de erro, com correlação por UUID.
+
+Os 9 testes HTTP executam `dist/src/main.js` em NODE_ENV=production contra
+o MySQL descartável, incluindo guards, pipes, filtros, parsers, CORS, Helmet,
+throttle e logs reais. Verificam também cadastro válido, rollback e ocultação
+de Prisma/SQL em falha interna. Os 15 outros testes MySQL comprovam rotação,
+concorrência e consistência financeira. Fixtures são removidas por seus IDs;
+nunca executam reset. O banco e o processo de API usados são exclusivos da
+validação. API real de produção, HTTPS e imagens finais não foram testados.
+
+## Entregas por implementação
+
+| Tópico | PR | Commit de implementação |
+| --- | --- | --- |
+| 1 | [Remove credenciais públicas](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/1) | `6fe4c43` |
+| 2 | [Corrige validação e rotação de tokens](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/2) | `180016a` |
+| 3 | [Preserva estoque e status](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/3) | `7939b58` |
+| 4 | [Corrige pagamentos e recebimentos](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/4) | `d5e4ccb`, `2aba9bb` |
+| 5 | [Isola sessões e cache](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/5) | `0d6df08` |
+| 6 | Branch `feat/validacao-http-segura`; PR após validação | Histórico da branch |
+
+PRs publicados pela conta autenticada `BevilacquaJulio`, com títulos e
+descrições normais e commits atribuídos a Julio. Os tópicos 7 e 8 continuam
+reservados; não há implementação parcial nem migrations desses tópicos.
 
 Referências primárias consultadas:
 [bcrypt e limite de 72 bytes](https://github.com/dcodeIO/bcrypt.js#security-considerations),

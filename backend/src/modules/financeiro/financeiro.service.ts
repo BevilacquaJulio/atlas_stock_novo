@@ -62,8 +62,13 @@ export class FinanceiroService {
   }
 
   async listDespesas({ page, limit, search, status }: FinanceiroQuery) {
+    if (status && !['A_PAGAR', 'PAGO', 'CANCELADA'].includes(status)) {
+      throw new BadRequestException('Status inválido para despesas.');
+    }
     const where: Prisma.DespesaWhereInput = {
-      ...(status === 'A_PAGAR' || status === 'PAGO' ? { status } : {}),
+      ...(status === 'A_PAGAR' || status === 'PAGO' || status === 'CANCELADA'
+        ? { status }
+        : {}),
       ...(search
         ? {
             OR: [
@@ -99,7 +104,9 @@ export class FinanceiroService {
       );
     }
     if (despesa.status !== 'A_PAGAR') {
-      throw new BadRequestException('Somente despesas a pagar podem ser editadas.');
+      throw new BadRequestException(
+        'Somente despesas a pagar podem ser editadas.',
+      );
     }
     return this.repo.updateDespesa(id, input);
   }
@@ -107,15 +114,22 @@ export class FinanceiroService {
   async pagarDespesa(id: number, dataPagamento?: Date) {
     const despesa = await this.findDespesa(id);
     if (despesa.compraId != null) {
-      throw new BadRequestException('Pague esta despesa pelo módulo de compras.');
+      throw new BadRequestException(
+        'Pague esta despesa pelo módulo de compras.',
+      );
     }
     if (despesa.status !== 'A_PAGAR') {
-      throw new BadRequestException('Somente despesas a pagar podem ser pagas.');
+      throw new BadRequestException(
+        'Somente despesas a pagar podem ser pagas.',
+      );
     }
     return this.repo.pagarDespesa(id, dataPagamento ?? new Date());
   }
 
   async listReceitas({ page, limit, search, status }: FinanceiroQuery) {
+    if (status && !['A_RECEBER', 'RECEBIDO'].includes(status)) {
+      throw new BadRequestException('Status inválido para receitas.');
+    }
     const where: Prisma.ReceitaWhereInput = {
       ...(status === 'A_RECEBER' || status === 'RECEBIDO' ? { status } : {}),
       ...(search
@@ -148,7 +162,9 @@ export class FinanceiroService {
   async updateReceita(id: number, input: UpdateReceitaInput) {
     const receita = await this.findReceita(id);
     if (receita.status === 'RECEBIDO') {
-      throw new BadRequestException('Receita já recebida não pode ser editada.');
+      throw new BadRequestException(
+        'Receita já recebida não pode ser editada.',
+      );
     }
     return this.repo.updateReceita(id, input);
   }

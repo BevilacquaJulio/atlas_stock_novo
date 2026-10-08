@@ -1,3 +1,4 @@
+import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import {
   Body,
   Controller,
@@ -6,14 +7,17 @@ import {
   HttpCode,
   HttpStatus,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { VeiculosService } from './veiculos.service';
-import { CreateVeiculoDto, UpdateVeiculoDto, VeiculoQueryDto } from './dto/veiculo.dto';
+import {
+  CreateVeiculoDto,
+  UpdateVeiculoDto,
+  VeiculoQueryDto,
+} from './dto/veiculo.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('veiculos')
@@ -28,7 +32,7 @@ export class VeiculosController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParseIdPipe) id: number) {
     return this.service.findOne(id);
   }
 
@@ -38,17 +42,14 @@ export class VeiculosController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateVeiculoDto,
-  ) {
+  update(@Param('id', ParseIdPipe) id: number, @Body() dto: UpdateVeiculoDto) {
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
   @Roles('ADMINISTRADOR', 'GERENTE')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  async remove(@Param('id', ParseIdPipe) id: number): Promise<void> {
     await this.service.remove(id);
   }
 }

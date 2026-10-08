@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { MAX_MONEY, MAX_QUANTITY } from '../../common/validators/bounds';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { Prisma, Produto } from '../../../generated/prisma/client';
 
@@ -68,7 +69,9 @@ export class MovimentacoesRepository {
     } = params;
 
     // Lock e leitura corrente evitam saldo obsoleto após esperar outra transação.
-    const [produto] = await tx.$queryRaw<Array<Pick<Produto, 'quantidadeEstoque' | 'custoMedio'>>>`
+    const [produto] = await tx.$queryRaw<
+      Array<Pick<Produto, 'quantidadeEstoque' | 'custoMedio'>>
+    >`
       SELECT quantidade_estoque AS quantidadeEstoque, custo_medio AS custoMedio
       FROM produtos WHERE id = ${produtoId} FOR UPDATE
     `;
@@ -95,6 +98,12 @@ export class MovimentacoesRepository {
         throw new Error('ESTOQUE_INSUFICIENTE');
       }
       novoEstoque = estoqueAtual - quantidade;
+    }
+
+    if (novoEstoque > MAX_QUANTITY || quantidade * custoUnitario > MAX_MONEY) {
+      throw new BadRequestException(
+        'Movimentação excede o limite de estoque ou valor permitido.',
+      );
     }
 
     const movimentacao = await tx.movimentacao.create({

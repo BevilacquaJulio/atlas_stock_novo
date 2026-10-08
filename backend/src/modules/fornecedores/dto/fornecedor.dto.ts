@@ -5,18 +5,24 @@ import {
   onlyDigits,
 } from '../../../common/validators/documents';
 
-export const createFornecedorSchema = z.object({
-  nomeRazaoSocial: z.string().trim().min(2).max(200),
-  cpfCnpj: z
-    .string()
-    .transform(onlyDigits)
-    .refine(isValidCpfCnpj, {
+export const createFornecedorSchema = z
+  .object({
+    nomeRazaoSocial: z.string().trim().min(2).max(200),
+    cpfCnpj: z.string().max(30).transform(onlyDigits).refine(isValidCpfCnpj, {
       message: 'CPF/CNPJ inválido.',
     }),
-  telefone: z.string().trim().max(30).optional().nullable(),
-  email: z.string().trim().email().max(180).optional().or(z.literal('')).nullable(),
-  ativo: z.boolean().default(true),
-});
+    telefone: z.string().trim().max(30).optional().nullable(),
+    email: z
+      .string()
+      .trim()
+      .email()
+      .max(180)
+      .optional()
+      .or(z.literal(''))
+      .nullable(),
+    ativo: z.boolean().default(true),
+  })
+  .strict();
 export class CreateFornecedorDto extends createZodDto(createFornecedorSchema) {}
 
 export const updateFornecedorSchema = createFornecedorSchema.partial();

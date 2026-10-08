@@ -1,3 +1,4 @@
+import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import {
   Body,
   Controller,
@@ -6,7 +7,6 @@ import {
   HttpCode,
   HttpStatus,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -38,7 +38,7 @@ export class ProjetosController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParseIdPipe) id: number) {
     return this.service.findOne(id);
   }
 
@@ -51,16 +51,13 @@ export class ProjetosController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateProjetoDto,
-  ) {
+  update(@Param('id', ParseIdPipe) id: number, @Body() dto: UpdateProjetoDto) {
     return this.service.update(id, dto);
   }
 
   @Patch(':id/status')
   alterarStatus(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: AlterarStatusProjetoDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -70,13 +67,13 @@ export class ProjetosController {
   @Delete(':id')
   @Roles('ADMINISTRADOR', 'GERENTE')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  async remove(@Param('id', ParseIdPipe) id: number): Promise<void> {
     await this.service.remove(id);
   }
 
   @Post(':id/checklist')
   addChecklistItem(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: CreateChecklistItemDto,
   ) {
     return this.service.addChecklistItem(id, dto);
@@ -84,8 +81,8 @@ export class ProjetosController {
 
   @Patch(':id/checklist/:itemId')
   updateChecklistItem(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('itemId', ParseIntPipe) itemId: number,
+    @Param('id', ParseIdPipe) id: number,
+    @Param('itemId', ParseIdPipe) itemId: number,
     @Body() dto: UpdateChecklistItemDto,
   ) {
     return this.service.updateChecklistItem(id, itemId, dto);
@@ -94,15 +91,15 @@ export class ProjetosController {
   @Delete(':id/checklist/:itemId')
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeChecklistItem(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('itemId', ParseIntPipe) itemId: number,
+    @Param('id', ParseIdPipe) id: number,
+    @Param('itemId', ParseIdPipe) itemId: number,
   ): Promise<void> {
     await this.service.removeChecklistItem(id, itemId);
   }
 
   @Post(':id/consumos')
   registrarConsumo(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: CreateConsumoDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {

@@ -203,6 +203,38 @@ Gate retornou HTTP 403. A consulta enviava o UUID v4 a um endpoint que exige
 o ID legado; foi corrigida para usar `legacyId`. Essa falha não foi convertida
 em aprovação nem o check removido.
 
+### Cobertura após o merge do PR #7
+
+A execução `37731226803` na main reprovou somente o Quality Gate: cobertura
+de código novo em 47,9%, contra 80% exigidos. O período `previous_version`
+começa em 07/10/2026 às 18h08 (America/Sao_Paulo). No PR não havia linhas
+novas sujeitas à cobertura; na main eram 779 linhas e 85 condições.
+
+Foram acrescentados 67 testes de backend para contratos de entrada, respostas
+de erro sem dados sensíveis, pipeline HTTP, logs, renovação/revogação de sessão,
+transições de compras e alterações financeiras condicionadas ao estado atual.
+Os testes HTTP usam Nest/Express e Supertest com a função real `configureApp`.
+Os testes unitários de repositório verificam os predicados das alterações;
+os testes MySQL existentes continuam responsáveis por concorrência e rollback reais.
+
+Validação local: 111 testes aprovados com cobertura, lint e tipos aprovados.
+O LCOV local, cruzado com as linhas novas retornadas pela API do SonarCloud,
+estima 83,2% (765/919 linhas e condições cobertas). O mesmo cálculo aplicado
+à análise anterior reproduz 47,9% (414/864). O denominador pode mudar porque
+o V8 passa a reportar mais condições quando os arquivos são exercitados.
+A confirmação oficial depende da próxima análise da main pelo SonarCloud.
+O limiar, o período de código novo e as exclusões de cobertura não foram alterados.
+
+Para validar os novos testes, em `backend`:
+
+```bash
+npm run typecheck:ci
+npm run lint:ci
+npm run test:cov
+```
+
+Mudanças exclusivamente em testes não exigem migrations ou deploy.
+
 Fontes oficiais consultadas:
 [GitHub merge protection](https://docs.github.com/en/code-security/concepts/code-scanning/merge-protection),
 [SonarCloud com Actions](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/github-actions-for-sonarcloud),

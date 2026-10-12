@@ -177,6 +177,7 @@ export class ComprasService {
             motivo: `Estorno recebimento — Compra #${compra.id}`,
             usuarioId,
             compraId: compra.id,
+            estornoDeEntrada: true,
           },
           tx,
         );
@@ -244,6 +245,11 @@ export class ComprasService {
         if (error.message === 'ESTOQUE_INSUFICIENTE') {
           throw new BadRequestException(
             'Estoque insuficiente para estornar o recebimento desta compra.',
+          );
+        }
+        if (error.message === 'CUSTO_MEDIO_INVALIDO') {
+          throw new BadRequestException(
+            'Não é possível estornar o recebimento: houve saídas do produto depois desta entrada e o custo médio ficaria inválido. Registre um ajuste de estoque.',
           );
         }
         if (error.message === 'PRODUTO_NAO_ENCONTRADO') {

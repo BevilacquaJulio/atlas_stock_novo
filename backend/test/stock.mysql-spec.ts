@@ -97,6 +97,31 @@ async function paidPurchase(productId: number) {
   await compras.pagar(c.id, {}, userId);
   return c.id;
 }
+async function receivedPurchase(
+  productId: number,
+  quantidade: number,
+  valorUnitario: number,
+) {
+  const c = await compras.create(
+    {
+      fornecedorId: supplierId,
+      itens: [{ produtoId: productId, quantidade, valorUnitario }],
+    },
+    userId,
+  );
+  await compras.pagar(c.id, {}, userId);
+  await compras.confirmar(c.id, userId);
+  return c.id;
+}
+async function saldo(productId: number) {
+  const p = await prisma.produto.findUniqueOrThrow({
+    where: { id: productId },
+  });
+  return {
+    quantidade: Number(p.quantidadeEstoque),
+    custoMedio: Number(p.custoMedio),
+  };
+}
 function successes(result: PromiseSettledResult<unknown>[]) {
   return result.filter((r) => r.status === 'fulfilled').length;
 }
@@ -213,6 +238,59 @@ describe('estoque e transições em MySQL isolado', () => {
     ).toBe(10);
     expect(await prisma.movimentacao.count({ where: { compraId: id } })).toBe(
       2,
+    );
+  });
+
+  it('estorno de recebimento sem operações no meio volta ao custo médio anterior', async () => {
+    const p = await product(); // 10 un a R$ 10
+    const id = await receivedPurchase(p.id, 10, 20);
+    expect(await saldo(p.id)).toEqual({ quantidade: 20, custoMedio: 15 });
+
+    await compras.desconfirmar(id, userId);
+
+    expect(await saldo(p.id)).toEqual({ quantidade: 10, custoMedio: 10 });
+    expect((await compras.findOne(id)).status).toBe('PAGO');
+  });
+
+  it('estorno com outra entrada no meio mantém o custo dos lotes que ficaram', async () => {
+    const p = await product(); // 10 un a R$ 10
+    const primeira = await receivedPurchase(p.id, 10, 20); // 20 un a R$ 15
+    await receivedPurchase(p.id, 10, 30); // 30 un a R$ 20
+
+    await compras.desconfirmar(primeira, userId);
+
+    // Restam os lotes de R$ 10 e R$ 30: média de R$ 20.
+    expect(await saldo(p.id)).toEqual({ quantidade: 20, custoMedio: 20 });
+  });
+
+  it('recusa estorno que deixaria custo médio inválido após consumo, sem alterar nada', async () => {
+    const p = await prisma.produto.create({
+      data: {
+        codigo: `${prefix}-custo`,
+        nome: 'Sintético',
+        unidadeMedida: 'UN',
+        quantidadeEstoque: 100,
+        custoMedio: 1,
+      },
+    });
+    products.push(p.id);
+    const id = await receivedPurchase(p.id, 10, 100); // 110 un a R$ 10
+    await movement.registrar({
+      produtoId: p.id,
+      tipo: 'SAIDA',
+      quantidade: 50,
+      custoUnitario: 10,
+      motivo: 'consumo sintético',
+      usuarioId: userId,
+    }); // 60 un a R$ 10 = R$ 600, menos que os R$ 1.000 da entrada
+
+    await expect(compras.desconfirmar(id, userId)).rejects.toThrow(
+      /custo médio ficaria inválido/,
+    );
+    expect(await saldo(p.id)).toEqual({ quantidade: 60, custoMedio: 10 });
+    expect((await compras.findOne(id)).status).toBe('CONFIRMADA');
+    expect(await prisma.movimentacao.count({ where: { compraId: id } })).toBe(
+      1,
     );
   });
 

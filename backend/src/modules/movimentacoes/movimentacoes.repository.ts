@@ -12,7 +12,35 @@ type RegistrarParams = {
   usuarioId: number;
   compraId?: number;
   projetoId?: number;
+  /**
+   * Saída que desfaz uma entrada (estorno de recebimento): além de tirar a
+   * quantidade, remove o valor da entrada do custo médio.
+   */
+  estornoDeEntrada?: boolean;
 };
+
+/**
+ * Custo médio depois de desfazer uma entrada na média ponderada:
+ * (saldo × custo médio − quantidade × custo da entrada) ÷ saldo restante.
+ * Sem outras movimentações no meio, volta exatamente ao custo anterior à
+ * entrada. Sem saldo restante, o custo não se aplica e fica como está (a
+ * próxima entrada o redefine). Se saídas posteriores deixaram menos valor em
+ * estoque do que a entrada representa, o resultado seria negativo: o estorno é
+ * recusado (CUSTO_MEDIO_INVALIDO) em vez de gravar um custo sem sentido.
+ */
+export function custoMedioAposEstorno(
+  estoque: number,
+  custoMedio: number,
+  quantidade: number,
+  custoEntrada: number,
+): number {
+  const restante = estoque - quantidade;
+  if (restante <= 0) return custoMedio;
+  const valorRestante = estoque * custoMedio - quantidade * custoEntrada;
+  // Tolerância de meio centavo para o arredondamento do custo gravado.
+  if (valorRestante < -0.005) throw new Error('CUSTO_MEDIO_INVALIDO');
+  return Math.max(valorRestante, 0) / restante;
+}
 
 @Injectable()
 export class MovimentacoesRepository {
@@ -66,6 +94,7 @@ export class MovimentacoesRepository {
       usuarioId,
       compraId,
       projetoId,
+      estornoDeEntrada,
     } = params;
 
     // Lock e leitura corrente evitam saldo obsoleto após esperar outra transação.
@@ -98,6 +127,14 @@ export class MovimentacoesRepository {
         throw new Error('ESTOQUE_INSUFICIENTE');
       }
       novoEstoque = estoqueAtual - quantidade;
+      if (estornoDeEntrada) {
+        novoCustoMedio = custoMedioAposEstorno(
+          estoqueAtual,
+          custoMedioAtual,
+          quantidade,
+          custoUnitario,
+        );
+      }
     }
 
     if (novoEstoque > MAX_QUANTITY || quantidade * custoUnitario > MAX_MONEY) {

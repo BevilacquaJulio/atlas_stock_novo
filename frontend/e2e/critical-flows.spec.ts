@@ -13,6 +13,14 @@ async function choose(
     .click();
 }
 
+/** Ação crítica: a API pede a senha do próprio usuário antes de concluir. */
+async function confirmPassword(page: Page, password: string): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: 'Confirme sua senha' });
+  await dialog.getByLabel('Sua senha', { exact: true }).fill(password);
+  await dialog.getByRole('button', { name: 'Confirmar', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+}
+
 async function stock(scenario: Scenario): Promise<number> {
   const product = await scenario.api<{ quantidadeEstoque: string }>(
     'GET',
@@ -46,7 +54,8 @@ test('login, renovação, logout e troca de conta preservam o bloqueio financeir
   await expect(page).toHaveURL(/\/login$/);
   await login(page, scenario.operatorEmail, scenario.password);
   await page.goto('/financeiro');
-  await expect(page.getByLabel('Senha financeira')).toBeVisible();
+  await expect(page.getByText('Sem acesso ao financeiro')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Financeiro' })).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Nova despesa', exact: true }),
   ).toHaveCount(0);
@@ -173,6 +182,9 @@ test('compra passa por pagamento, recebimento, estornos e cancelamento com despe
   ] as const) {
     page.once('dialog', (dialog) => dialog.accept());
     await row.getByRole('button', { name: action, exact: true }).click();
+    // Só a primeira ação crítica pede a senha; as seguintes reaproveitam a
+    // confirmação, válida por alguns minutos.
+    if (action === 'Pagar') await confirmPassword(page, scenario.password);
     await expect
       .poll(
         async () =>
@@ -261,17 +273,12 @@ test('projeto registra checklist, consumo e conclusão sem perder saldo', async 
   expect(await stock(scenario)).toBe(8);
 });
 
-test('financeiro exige desbloqueio, paga despesas, recebe receitas e limpa acesso no logout', async ({
+test('financeiro libera gerente autorizado, pede a senha dele nas baixas e bloqueia operador', async ({
   page,
   scenario,
 }) => {
-  await login(page, scenario.operatorEmail, scenario.password);
+  await login(page, scenario.managerEmail, scenario.password);
   await page.goto('/financeiro');
-  await page.getByLabel('Senha financeira').fill('wrong-synthetic-password');
-  await page.getByRole('button', { name: 'Desbloquear', exact: true }).click();
-  await expect(page.getByText('Senha financeira incorreta.')).toBeVisible();
-  await page.getByLabel('Senha financeira').fill(scenario.financePassword);
-  await page.getByRole('button', { name: 'Desbloquear', exact: true }).click();
   await page.getByRole('button', { name: 'Nova despesa', exact: true }).click();
   let modal = page.getByRole('dialog', { name: 'Nova despesa' });
   await modal
@@ -286,6 +293,13 @@ test('financeiro exige desbloqueio, paga despesas, recebe receitas e limpa acess
     .getByRole('row')
     .filter({ hasText: `${scenario.prefix} despesa` });
   await expenseRow.getByRole('button', { name: 'Pagar', exact: true }).click();
+  const reauth = page.getByRole('dialog', { name: 'Confirme sua senha' });
+  await reauth
+    .getByLabel('Sua senha', { exact: true })
+    .fill('wrong-synthetic-password');
+  await reauth.getByRole('button', { name: 'Confirmar', exact: true }).click();
+  await expect(reauth.getByText('Senha incorreta.')).toBeVisible();
+  await confirmPassword(page, scenario.password);
   await expect(expenseRow.getByText('Pago', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'Receitas', exact: true }).click();
   await page.getByRole('button', { name: 'Nova receita', exact: true }).click();
@@ -308,5 +322,5 @@ test('financeiro exige desbloqueio, paga despesas, recebe receitas e limpa acess
   await expect(page).toHaveURL(/\/login$/);
   await login(page, scenario.operatorEmail, scenario.password);
   await page.goto('/financeiro');
-  await expect(page.getByLabel('Senha financeira')).toBeVisible();
+  await expect(page.getByText('Sem acesso ao financeiro')).toBeVisible();
 });

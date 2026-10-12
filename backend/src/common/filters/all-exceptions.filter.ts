@@ -115,11 +115,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
           ? res
           : (((res as Record<string, unknown>)?.message as string) ??
             exception.message);
+      // Exceções podem trazer um código próprio (ex.: REAUTENTICACAO_NECESSARIA)
+      // para o frontend reagir sem depender do texto da mensagem.
+      const code =
+        typeof res === 'object' &&
+        typeof (res as Record<string, unknown>).code === 'string'
+          ? ((res as Record<string, unknown>).code as string)
+          : this.codeFromStatus(status);
       return {
         status,
         body: {
           error: {
-            code: this.codeFromStatus(status),
+            code,
             message: Array.isArray(message) ? message.join('; ') : message,
           },
         },

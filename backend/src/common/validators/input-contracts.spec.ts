@@ -188,12 +188,6 @@ describe('contratos financeiros e de estoque', () => {
     expect(
       financeiro.receberReceitaSchema.safeParse({ valor: 1 }).success,
     ).toBe(false);
-    expect(financeiro.desbloquearSchema.parse({ senha: 'pass' })).toEqual({
-      senha: 'pass',
-    });
-    expect(financeiro.desbloquearSchema.safeParse({ senha: '' }).success).toBe(
-      false,
-    );
     expect(
       financeiro.createCategoriaDespesaSchema.parse({ nome: ' Taxas ' }),
     ).toEqual({ nome: 'Taxas', ativo: true });

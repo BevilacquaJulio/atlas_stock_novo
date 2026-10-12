@@ -16,9 +16,12 @@ import { FornecedoresService } from './fornecedores.service';
 import { CreateFornecedorDto, UpdateFornecedorDto } from './dto/fornecedor.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { TODOS_OS_CARGOS } from '../../common/auth/permissoes';
+import { InativacaoRestrita } from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('fornecedores')
 @ApiBearerAuth()
+@Roles(...TODOS_OS_CARGOS)
 @Controller('fornecedores')
 export class FornecedoresController {
   constructor(private readonly service: FornecedoresService) {}
@@ -39,6 +42,7 @@ export class FornecedoresController {
   }
 
   @Patch(':id')
+  @InativacaoRestrita()
   update(
     @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateFornecedorDto,

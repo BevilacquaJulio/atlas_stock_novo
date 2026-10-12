@@ -201,7 +201,6 @@ JWT_REFRESH_SECRET=outro-segredo-forte-e-exclusivo
 CORS_ORIGIN=https://g5.seudominio.com.br
 SEED_ADMIN_EMAIL=admin@atlas.com
 SEED_ADMIN_PASSWORD=senha-forte-do-administrador
-SEED_FINANCEIRO_SENHA=senha-forte-do-financeiro
 ```
 
 `MYSQL_HOST` deve ser o nome resolvível do container MySQL dentro da rede
@@ -249,9 +248,14 @@ No primeiro deploy:
 docker compose run --rm migrate npx ts-node prisma/seed.ts
 ```
 
-O seed exige `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` e
-`SEED_FINANCEIRO_SENHA` definidos no `.env`. As duas senhas devem ter pelo
-menos 12 caracteres e não são exibidas nos logs.
+O seed exige `SEED_ADMIN_EMAIL` e `SEED_ADMIN_PASSWORD` definidos no `.env`.
+A senha deve ter pelo menos 12 caracteres e não é exibida nos logs.
+
+O financeiro não usa mais senha compartilhada. O administrador sempre tem
+acesso e concede a permissão financeira a gerentes específicos na tela
+**Usuários**; operadores não acessam o financeiro. Pagamentos, recebimentos,
+estornos, cancelamentos e alterações de acesso pedem a confirmação da senha do
+próprio usuário.
 
 ### 5. Construir e iniciar a aplicação
 

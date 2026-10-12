@@ -3,15 +3,11 @@ import {
   ConflictException,
   BadRequestException,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { FinanceiroService } from './financeiro.service';
 import { FinanceiroRepository } from './financeiro.repository';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 
 const makeRepo = () => ({
-  verifyFinanceiroSenha: vi.fn(),
   findDespesas: vi.fn(),
   findDespesaById: vi.fn(),
   createDespesa: vi.fn(),
@@ -32,42 +28,9 @@ const makeRepo = () => ({
 describe('FinanceiroService', () => {
   let repo: ReturnType<typeof makeRepo>;
   let service: FinanceiroService;
-  const jwt = {
-    signAsync: vi.fn().mockResolvedValue('token-xyz'),
-  } as unknown as JwtService;
-  const config = {
-    get: vi.fn().mockReturnValue('secret'),
-  } as unknown as ConfigService;
-
   beforeEach(() => {
     repo = makeRepo();
-    service = new FinanceiroService(
-      repo as unknown as FinanceiroRepository,
-      jwt,
-      config,
-    );
-  });
-
-  it('administrador não precisa de token de desbloqueio', async () => {
-    const result = await service.desbloquear('x', {
-      id: 1,
-      nome: 'Admin',
-      email: 'a@b.c',
-      cargo: 'ADMINISTRADOR',
-    });
-    expect(result.token).toBeNull();
-  });
-
-  it('rejeita senha financeira incorreta', async () => {
-    repo.verifyFinanceiroSenha.mockResolvedValue(false);
-    await expect(
-      service.desbloquear('errada', {
-        id: 1,
-        nome: 'Op',
-        email: 'a@b.c',
-        cargo: 'OPERADOR',
-      }),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    service = new FinanceiroService(repo as unknown as FinanceiroRepository);
   });
 
   it('despesa inexistente lança 404', async () => {

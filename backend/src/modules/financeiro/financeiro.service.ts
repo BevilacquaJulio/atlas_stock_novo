@@ -3,10 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { FinanceiroRepository } from './financeiro.repository';
 import { buildPaginated } from '../../common/dto/pagination.dto';
 import type {
@@ -18,48 +15,10 @@ import type {
   UpdateReceitaInput,
 } from './dto/financeiro.dto';
 import type { Prisma } from '../../../generated/prisma/client';
-import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import { jwtPolicy } from '../../common/auth/jwt-policy';
 
 @Injectable()
 export class FinanceiroService {
-  constructor(
-    private readonly repo: FinanceiroRepository,
-    private readonly jwtService: JwtService,
-    private readonly config: ConfigService,
-  ) {}
-
-  async desbloquear(senha: string, user: AuthenticatedUser) {
-    if (user.cargo === 'ADMINISTRADOR') {
-      return { token: null, expiresIn: null };
-    }
-
-    const ok = await this.repo.verifyFinanceiroSenha(senha);
-    if (!ok) {
-      throw new UnauthorizedException('Senha financeira incorreta.');
-    }
-
-    const expiresIn = '8h';
-    const token = await this.jwtService.signAsync(
-      { purpose: 'financeiro_unlock', sub: user.id },
-      {
-        issuer: jwtPolicy.issuer,
-        audience: jwtPolicy.audience,
-        algorithm: 'HS256',
-        secret: this.config.get<string>('JWT_ACCESS_SECRET'),
-        expiresIn,
-      },
-    );
-
-    return { token, expiresIn };
-  }
-
-  statusDesbloqueio(user: AuthenticatedUser) {
-    return {
-      requerDesbloqueio: user.cargo !== 'ADMINISTRADOR',
-      desbloqueado: user.cargo === 'ADMINISTRADOR',
-    };
-  }
+  constructor(private readonly repo: FinanceiroRepository) {}
 
   async listDespesas({ page, limit, search, status }: FinanceiroQuery) {
     if (status && !['A_PAGAR', 'PAGO', 'CANCELADA'].includes(status)) {

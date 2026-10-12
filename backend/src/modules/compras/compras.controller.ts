@@ -17,9 +17,21 @@ import {
 } from './dto/compra.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { CARGOS_GESTAO, TODOS_OS_CARGOS } from '../../common/auth/permissoes';
+import {
+  AcessoFinanceiro,
+  ExigeReautenticacao,
+} from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('compras')
 @ApiBearerAuth()
+/**
+ * Compras são abertas a todos os cargos; pagamento, estorno do pagamento e
+ * cancelamento mexem no financeiro e seguem a mesma regra do módulo
+ * financeiro. Estornar o recebimento (saída do estoque) é da gestão.
+ */
+@Roles(...TODOS_OS_CARGOS)
 @Controller('compras')
 export class ComprasController {
   constructor(private readonly service: ComprasService) {}
@@ -40,6 +52,8 @@ export class ComprasController {
   }
 
   @Patch(':id/pagar')
+  @AcessoFinanceiro()
+  @ExigeReautenticacao()
   pagar(
     @Param('id', ParseIdPipe) id: number,
     @Body() dto: PagarCompraDto,
@@ -57,6 +71,7 @@ export class ComprasController {
   }
 
   @Patch(':id/desconfirmar')
+  @Roles(...CARGOS_GESTAO)
   desconfirmar(
     @Param('id', ParseIdPipe) id: number,
     @CurrentUser() user: AuthenticatedUser,
@@ -65,11 +80,15 @@ export class ComprasController {
   }
 
   @Patch(':id/estornar-pagamento')
+  @AcessoFinanceiro()
+  @ExigeReautenticacao()
   estornarPagamento(@Param('id', ParseIdPipe) id: number) {
     return this.service.estornarPagamento(id);
   }
 
   @Patch(':id/cancelar')
+  @AcessoFinanceiro()
+  @ExigeReautenticacao()
   cancelar(@Param('id', ParseIdPipe) id: number) {
     return this.service.cancelar(id);
   }

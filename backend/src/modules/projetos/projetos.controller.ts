@@ -25,9 +25,12 @@ import {
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { TODOS_OS_CARGOS } from '../../common/auth/permissoes';
+import { InativacaoRestrita } from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('projetos')
 @ApiBearerAuth()
+@Roles(...TODOS_OS_CARGOS)
 @Controller('projetos')
 export class ProjetosController {
   constructor(private readonly service: ProjetosService) {}
@@ -51,6 +54,7 @@ export class ProjetosController {
   }
 
   @Patch(':id')
+  @InativacaoRestrita()
   update(@Param('id', ParseIdPipe) id: number, @Body() dto: UpdateProjetoDto) {
     return this.service.update(id, dto);
   }

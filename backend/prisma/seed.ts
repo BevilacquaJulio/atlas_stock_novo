@@ -21,9 +21,6 @@ const adminEmail = requireSeedEnv('SEED_ADMIN_EMAIL');
 const adminSenha = newPasswordSchema.parse(
   requireSeedEnv('SEED_ADMIN_PASSWORD', 12),
 );
-const financeiroSenha = newPasswordSchema.parse(
-  requireSeedEnv('SEED_FINANCEIRO_SENHA', 12),
-);
 
 const prisma = new PrismaClient({
   adapter: new PrismaMariaDb(buildDatabaseConfig()),
@@ -64,13 +61,6 @@ async function main(): Promise<void> {
       create: { nome },
     });
   }
-
-  const financeiroSenhaHash = await bcrypt.hash(financeiroSenha, 10);
-  await prisma.configSistema.upsert({
-    where: { id: 1 },
-    update: { financeiroSenhaHash },
-    create: { id: 1, financeiroSenhaHash },
-  });
 
   // eslint-disable-next-line no-console
   console.log(`Seed concluído. Administrador configurado: ${adminEmail}.`);

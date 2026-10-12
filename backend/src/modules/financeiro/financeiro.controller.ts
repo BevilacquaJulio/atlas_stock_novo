@@ -9,69 +9,51 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
 import { FinanceiroService } from './financeiro.service';
 import {
   CreateCategoriaDespesaDto,
   CreateDespesaDto,
   CreateReceitaDto,
-  DesbloquearDto,
   FinanceiroQueryDto,
   PagarDespesaDto,
   ReceberReceitaDto,
   UpdateDespesaDto,
   UpdateReceitaDto,
 } from './dto/financeiro.dto';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { FinanceiroUnlock } from '../../common/decorators/financeiro-unlock.decorator';
-import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import {
+  AcessoFinanceiro,
+  ExigeReautenticacao,
+} from '../../common/decorators/permissoes.decorator';
 
+/** Todo o módulo exige permissão financeira; baixas exigem também reautenticação. */
 @ApiTags('financeiro')
 @ApiBearerAuth()
+@AcessoFinanceiro()
 @Controller('financeiro')
 export class FinanceiroController {
   constructor(private readonly service: FinanceiroService) {}
 
-  @Get('status')
-  status(@CurrentUser() user: AuthenticatedUser) {
-    return this.service.statusDesbloqueio(user);
-  }
-
-  @Post('desbloquear')
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  desbloquear(
-    @Body() dto: DesbloquearDto,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    return this.service.desbloquear(dto.senha, user);
-  }
-
   @Get('resumo')
-  @FinanceiroUnlock()
   resumo() {
     return this.service.resumo();
   }
 
   @Get('despesas')
-  @FinanceiroUnlock()
   listDespesas(@Query() query: FinanceiroQueryDto) {
     return this.service.listDespesas(query);
   }
 
   @Get('despesas/:id')
-  @FinanceiroUnlock()
   findDespesa(@Param('id', ParseIdPipe) id: number) {
     return this.service.findDespesa(id);
   }
 
   @Post('despesas')
-  @FinanceiroUnlock()
   createDespesa(@Body() dto: CreateDespesaDto) {
     return this.service.createDespesa(dto);
   }
 
   @Patch('despesas/:id')
-  @FinanceiroUnlock()
   updateDespesa(
     @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateDespesaDto,
@@ -80,7 +62,7 @@ export class FinanceiroController {
   }
 
   @Patch('despesas/:id/pagar')
-  @FinanceiroUnlock()
+  @ExigeReautenticacao()
   pagarDespesa(
     @Param('id', ParseIdPipe) id: number,
     @Body() dto: PagarDespesaDto,
@@ -89,25 +71,21 @@ export class FinanceiroController {
   }
 
   @Get('receitas')
-  @FinanceiroUnlock()
   listReceitas(@Query() query: FinanceiroQueryDto) {
     return this.service.listReceitas(query);
   }
 
   @Get('receitas/:id')
-  @FinanceiroUnlock()
   findReceita(@Param('id', ParseIdPipe) id: number) {
     return this.service.findReceita(id);
   }
 
   @Post('receitas')
-  @FinanceiroUnlock()
   createReceita(@Body() dto: CreateReceitaDto) {
     return this.service.createReceita(dto);
   }
 
   @Patch('receitas/:id')
-  @FinanceiroUnlock()
   updateReceita(
     @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateReceitaDto,
@@ -116,7 +94,7 @@ export class FinanceiroController {
   }
 
   @Patch('receitas/:id/receber')
-  @FinanceiroUnlock()
+  @ExigeReautenticacao()
   receberReceita(
     @Param('id', ParseIdPipe) id: number,
     @Body() dto: ReceberReceitaDto,
@@ -125,13 +103,11 @@ export class FinanceiroController {
   }
 
   @Get('categorias-despesa')
-  @FinanceiroUnlock()
   listCategorias() {
     return this.service.listCategoriasDespesa();
   }
 
   @Post('categorias-despesa')
-  @FinanceiroUnlock()
   createCategoria(@Body() dto: CreateCategoriaDespesaDto) {
     return this.service.createCategoriaDespesa(dto);
   }

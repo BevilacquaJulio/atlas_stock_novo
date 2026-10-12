@@ -6,6 +6,8 @@ export interface AuthenticatedUser {
   nome: string;
   email: string;
   cargo: Cargo;
+  /** Permissão financeira efetiva, calculada no servidor (temAcessoFinanceiro). */
+  acessoFinanceiro: boolean;
 }
 
 /** Claims do JWT (access token). */

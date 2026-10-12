@@ -18,9 +18,12 @@ import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { TODOS_OS_CARGOS } from '../../common/auth/permissoes';
+import { InativacaoRestrita } from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('produtos')
 @ApiBearerAuth()
+@Roles(...TODOS_OS_CARGOS)
 @Controller('produtos')
 export class ProdutosController {
   constructor(private readonly service: ProdutosService) {}
@@ -44,6 +47,7 @@ export class ProdutosController {
   }
 
   @Patch(':id')
+  @InativacaoRestrita()
   update(@Param('id', ParseIdPipe) id: number, @Body() dto: UpdateProdutoDto) {
     return this.service.update(id, dto);
   }

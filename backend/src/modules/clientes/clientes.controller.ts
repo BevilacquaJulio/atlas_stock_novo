@@ -16,9 +16,12 @@ import { ClientesService } from './clientes.service';
 import { CreateClienteDto, UpdateClienteDto } from './dto/cliente.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { TODOS_OS_CARGOS } from '../../common/auth/permissoes';
+import { InativacaoRestrita } from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('clientes')
 @ApiBearerAuth()
+@Roles(...TODOS_OS_CARGOS)
 @Controller('clientes')
 export class ClientesController {
   constructor(private readonly service: ClientesService) {}
@@ -39,6 +42,7 @@ export class ClientesController {
   }
 
   @Patch(':id')
+  @InativacaoRestrita()
   update(@Param('id', ParseIdPipe) id: number, @Body() dto: UpdateClienteDto) {
     return this.service.update(id, dto);
   }

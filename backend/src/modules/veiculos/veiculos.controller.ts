@@ -19,9 +19,12 @@ import {
   VeiculoQueryDto,
 } from './dto/veiculo.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { TODOS_OS_CARGOS } from '../../common/auth/permissoes';
+import { InativacaoRestrita } from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('veiculos')
 @ApiBearerAuth()
+@Roles(...TODOS_OS_CARGOS)
 @Controller('veiculos')
 export class VeiculosController {
   constructor(private readonly service: VeiculosService) {}
@@ -42,6 +45,7 @@ export class VeiculosController {
   }
 
   @Patch(':id')
+  @InativacaoRestrita()
   update(@Param('id', ParseIdPipe) id: number, @Body() dto: UpdateVeiculoDto) {
     return this.service.update(id, dto);
   }

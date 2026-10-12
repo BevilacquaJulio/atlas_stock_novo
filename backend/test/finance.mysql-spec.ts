@@ -1,14 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { FinanceiroRepository } from '../src/modules/financeiro/financeiro.repository';
 import { FinanceiroService } from '../src/modules/financeiro/financeiro.service';
 import { testDatabase } from './mysql-fixture';
 
 const prisma = testDatabase();
 const repo = new FinanceiroRepository(prisma);
-const service = new FinanceiroService(repo, new JwtService(), new ConfigService());
+const service = new FinanceiroService(repo);
 const expenses: number[] = [];
 const revenues: number[] = [];
 let userId: number;

@@ -5,9 +5,13 @@ import { DashboardRepository } from './dashboard.repository';
 export class DashboardService {
   constructor(private readonly repo: DashboardRepository) {}
 
-  async getOverview() {
+  /**
+   * Totais de despesas e receitas só saem para quem tem acesso financeiro;
+   * para os demais nem são consultados (vêm como null).
+   */
+  async getOverview(acessoFinanceiro: boolean) {
     const [contagens, projetosRecentes] = await Promise.all([
-      this.repo.getCounts(),
+      this.repo.getCounts(acessoFinanceiro),
       this.repo.recentProjetos(),
     ]);
 
@@ -24,7 +28,7 @@ export class DashboardService {
               },
             ]
           : []),
-        ...(contagens.despesasAPagar.quantidade > 0
+        ...(contagens.despesasAPagar && contagens.despesasAPagar.quantidade > 0
           ? [
               {
                 tipo: 'despesas',

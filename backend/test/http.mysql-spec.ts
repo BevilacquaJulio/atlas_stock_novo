@@ -250,9 +250,17 @@ describe('pipeline HTTP real em MySQL isolado', () => {
         }),
       })
       .expect(422);
+    // Criar usuário exige a confirmação de senha (guard antes da validação):
+    // sem ela a resposta é 403; com ela, a senha acima de 72 bytes é recusada.
+    const confirmacao = await api
+      .post('/api/auth/reautenticar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ senha: password })
+      .expect(200);
     await api
       .post('/api/usuarios')
       .set('Authorization', `Bearer ${token}`)
+      .set('X-Reautenticacao', confirmacao.body.token)
       .send({
         nome: 'Teste',
         email: `invalid-${marker}@example.test`,

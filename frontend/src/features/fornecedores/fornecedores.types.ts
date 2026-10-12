@@ -14,5 +14,6 @@ export interface FornecedorFormValues {
   cpfCnpj: string;
   telefone?: string | null;
   email?: string | null;
-  ativo: boolean;
+  /** Só a gestão envia; ausente = não altera. */
+  ativo?: boolean;
 }

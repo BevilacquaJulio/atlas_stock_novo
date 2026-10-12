@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { type ArgumentsHost, HttpException, Logger } from '@nestjs/common';
+import {
+  type ArgumentsHost,
+  ForbiddenException,
+  HttpException,
+  Logger,
+} from '@nestjs/common';
 import { ZodValidationException } from 'nestjs-zod';
 import { z } from 'zod';
 import { AllExceptionsFilter } from './all-exceptions.filter';
@@ -36,6 +41,26 @@ describe('respostas seguras de erros', () => {
       status,
       body: {
         error: { code, message: 'Mensagem pública', requestId: 'request-123' },
+      },
+    });
+  });
+
+  it('usa o código próprio da exceção quando ela informa um', () => {
+    expect(
+      respond(
+        new ForbiddenException({
+          code: 'REAUTENTICACAO_NECESSARIA',
+          message: 'Confirme sua senha para concluir esta ação.',
+        }),
+      ),
+    ).toEqual({
+      status: 403,
+      body: {
+        error: {
+          code: 'REAUTENTICACAO_NECESSARIA',
+          message: 'Confirme sua senha para concluir esta ação.',
+          requestId: 'request-123',
+        },
       },
     });
   });

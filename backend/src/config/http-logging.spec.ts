@@ -39,6 +39,7 @@ describe('logs HTTP sem dados sensíveis', () => {
         .set('Authorization', 'Bearer secret-auth')
         .set('Cookie', 'secret-cookie')
         .set('X-Financeiro-Token', 'secret-financial')
+        .set('X-Reautenticacao', 'secret-reauth')
         .set('X-Request-Id', 'untrusted')
         .send({ senha: 'secret-password' })
         .expect(201);

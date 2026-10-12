@@ -12,6 +12,7 @@ export const httpLoggingOptions: Options = {
       'req.headers.authorization',
       'req.headers.cookie',
       'req.headers["x-financeiro-token"]',
+      'req.headers["x-reautenticacao"]',
       'res.headers["set-cookie"]',
     ],
     remove: true,

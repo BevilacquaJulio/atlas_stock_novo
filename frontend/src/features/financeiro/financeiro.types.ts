@@ -65,11 +65,6 @@ export interface FinanceiroQuery {
   status?: string;
 }
 
-export interface FinanceiroStatus {
-  requerDesbloqueio: boolean;
-  desbloqueado: boolean;
-}
-
 export interface FinanceiroResumo {
   despesasAPagar: { total: string | number; quantidade: number };
   receitasAReceber: { total: string | number; quantidade: number };

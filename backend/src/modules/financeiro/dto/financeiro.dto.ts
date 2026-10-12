@@ -2,13 +2,6 @@ import { idSchema, moneySchema } from '../../../common/validators/bounds';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
-export const desbloquearSchema = z
-  .object({
-    senha: z.string().min(1).max(1024),
-  })
-  .strict();
-export class DesbloquearDto extends createZodDto(desbloquearSchema) {}
-
 export const createDespesaSchema = z
   .object({
     descricao: z.string().trim().min(1).max(200),

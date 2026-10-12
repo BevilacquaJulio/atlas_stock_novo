@@ -23,8 +23,9 @@ export interface Scenario {
   prefix: string;
   adminEmail: string;
   operatorEmail: string;
+  /** Gerente com permissão financeira explícita. */
+  managerEmail: string;
   password: string;
-  financePassword: string;
   productId: number;
   productCode: string;
   supplierName: string;
@@ -53,14 +54,12 @@ export const test = base.extend<{ scenario: Scenario }>({
     const prisma = new PrismaService();
     const prefix = `e2e-${randomUUID()}`;
     const password = 'synthetic-e2e-password-only';
-    const financePassword = 'synthetic-e2e-financial-only';
     const users: number[] = [];
     let categoryId: number | undefined;
     let supplierId: number | undefined;
     let clientId: number | undefined;
     let productId: number | undefined;
     let financeCategoryId: number | undefined;
-    let createdConfig = false;
     try {
       await prisma.$connect();
       const senha = await hash(password, 10);
@@ -82,6 +81,16 @@ export const test = base.extend<{ scenario: Scenario }>({
         },
       });
       users.push(operator.id);
+      const manager = await prisma.usuario.create({
+        data: {
+          nome: `${prefix} manager`,
+          email: `${prefix}-manager@example.test`,
+          senha,
+          cargo: 'GERENTE',
+          acessoFinanceiro: true,
+        },
+      });
+      users.push(manager.id);
       categoryId = (await prisma.categoria.create({ data: { nome: prefix } }))
         .id;
       financeCategoryId = (
@@ -120,10 +129,6 @@ export const test = base.extend<{ scenario: Scenario }>({
         },
       });
       productId = product.id;
-      await prisma.configSistema.create({
-        data: { id: 1, financeiroSenhaHash: await hash(financePassword, 10) },
-      });
-      createdConfig = true;
       const token = await new JwtService().signAsync(
         {
           purpose: 'access',
@@ -144,8 +149,8 @@ export const test = base.extend<{ scenario: Scenario }>({
         prefix,
         adminEmail: admin.email,
         operatorEmail: operator.email,
+        managerEmail: manager.email,
         password,
-        financePassword,
         productId,
         productCode: product.codigo,
         supplierName: `${prefix} fornecedor`,
@@ -215,8 +220,6 @@ export const test = base.extend<{ scenario: Scenario }>({
       });
       if (users.length)
         await prisma.usuario.deleteMany({ where: { id: { in: users } } });
-      if (createdConfig)
-        await prisma.configSistema.delete({ where: { id: 1 } });
       await prisma.$disconnect();
     }
   },

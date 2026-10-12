@@ -79,6 +79,9 @@ model Usuario {
   senha     String   @map("senha") @db.VarChar(255) // hash bcrypt
   cargo     Cargo    @default(OPERADOR)
   ativo     Boolean  @default(true)
+  /// Permissão financeira explícita. Só vale para GERENTE: administrador
+  /// sempre tem acesso e operador nunca tem (ver common/auth/permissoes.ts).
+  acessoFinanceiro Boolean @default(false) @map("acesso_financeiro")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -430,7 +433,9 @@ model Receita {
   @@map("receitas")
 }
 
-/// Configuração singleton do sistema (senha financeiro, etc.).
+/// Configuração singleton do sistema.
+/// `financeiroSenhaHash` não é mais usado (o acesso financeiro passou a ser
+/// nominal); a coluna sai na padronização do banco, sem perder dados agora.
 model ConfigSistema {
   id                  Int      @id @default(1)
   financeiroSenhaHash String?  @map("financeiro_senha_hash") @db.VarChar(255)

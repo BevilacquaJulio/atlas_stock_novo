@@ -1,3 +1,4 @@
+import { semCampoAtivo, usePermissoes } from '../auth/permissoes';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -55,6 +56,7 @@ export function ClienteForm({
   const [cepError, setCepError] = useState<string | null>(null);
   const lastLookedUpCep = useRef<string | null>(null);
 
+  const { gestao } = usePermissoes();
   const {
     register,
     handleSubmit,
@@ -138,7 +140,9 @@ export function ClienteForm({
   return (
     <form
       id="cliente-form"
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit((values) =>
+        onSubmit(gestao ? values : semCampoAtivo(values)),
+      )}
       className="flex flex-col gap-3"
     >
       {error && <Alert kind="error">{error}</Alert>}
@@ -219,11 +223,13 @@ export function ClienteForm({
         className="min-h-14"
         {...register('observacoes')}
       />
-      <SwitchField
-        label="Ativo"
-        description="Clientes inativos não aparecem em novas operações."
-        {...register('ativo')}
-      />
+      {gestao && (
+        <SwitchField
+          label="Ativo"
+          description="Clientes inativos não aparecem em novas operações."
+          {...register('ativo')}
+        />
+      )}
     </form>
   );
 }

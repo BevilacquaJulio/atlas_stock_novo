@@ -1,3 +1,4 @@
+import { semCampoAtivo, usePermissoes } from '../auth/permissoes';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -43,6 +44,7 @@ export function ProdutoForm({
 
   const unidadeOptions = resolveUnidadeMedidaOptions(initial?.unidadeMedida);
 
+  const { gestao } = usePermissoes();
   const {
     register,
     handleSubmit,
@@ -68,7 +70,9 @@ export function ProdutoForm({
   return (
     <form
       id="produto-form"
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit((values) =>
+        onSubmit(gestao ? values : semCampoAtivo(values)),
+      )}
       className="flex flex-col gap-4"
     >
       {error && <Alert kind="error">{error}</Alert>}
@@ -125,11 +129,13 @@ export function ProdutoForm({
         </p>
       )}
       <TextareaField label="Descrição" {...register('descricao')} />
-      <SwitchField
-        label="Ativo"
-        description="Produtos inativos não entram em compras ou consumos."
-        {...register('ativo')}
-      />
+      {gestao && (
+        <SwitchField
+          label="Ativo"
+          description="Produtos inativos não entram em compras ou consumos."
+          {...register('ativo')}
+        />
+      )}
     </form>
   );
 }

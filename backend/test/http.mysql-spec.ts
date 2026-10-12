@@ -22,6 +22,46 @@ let categoryId: number | undefined;
 let productId: number | undefined;
 let token = '';
 let refreshToken = '';
+let supplierId: number | undefined;
+const purchaseIds: number[] = [];
+const extraUserIds: number[] = [];
+
+/** Access token assinado como a API faz; evita logins que contam no limite. */
+async function accessFor(id: number, cargo: string) {
+  return new JwtService().signAsync(
+    {
+      purpose: 'access',
+      sub: id,
+      email: `x-${id}@example.test`,
+      cargo,
+      nome: 'x',
+    },
+    {
+      issuer: jwtPolicy.issuer,
+      audience: jwtPolicy.audience,
+      algorithm: 'HS256',
+      secret: accessSecret,
+      expiresIn: '15m',
+    },
+  );
+}
+
+async function syntheticUser(
+  cargo: 'GERENTE' | 'OPERADOR',
+  acessoFinanceiro = false,
+) {
+  const user = await prisma.usuario.create({
+    data: {
+      nome: `HTTP ${cargo}`,
+      email: `http-${cargo.toLowerCase()}-${acessoFinanceiro}-${randomUUID()}@example.test`,
+      senha: await bcrypt.hash(password, 10),
+      cargo,
+      acessoFinanceiro,
+    },
+  });
+  extraUserIds.push(user.id);
+  return { id: user.id, bearer: `Bearer ${await accessFor(user.id, cargo)}` };
+}
 
 beforeAll(async () => {
   await prisma.$connect();
@@ -92,6 +132,13 @@ afterAll(async () => {
       new Promise((resolve) => setTimeout(resolve, 3000)),
     ]);
     if (server.exitCode === null) server.kill('SIGKILL');
+  }
+  if (purchaseIds.length) {
+    await prisma.compra.deleteMany({ where: { id: { in: purchaseIds } } });
+  }
+  if (supplierId) await prisma.fornecedor.delete({ where: { id: supplierId } });
+  if (extraUserIds.length) {
+    await prisma.usuario.deleteMany({ where: { id: { in: extraUserIds } } });
   }
   if (productId) {
     await prisma.movimentacao.deleteMany({ where: { produtoId: productId } });
@@ -203,9 +250,17 @@ describe('pipeline HTTP real em MySQL isolado', () => {
         }),
       })
       .expect(422);
+    // Criar usuário exige a confirmação de senha (guard antes da validação):
+    // sem ela a resposta é 403; com ela, a senha acima de 72 bytes é recusada.
+    const confirmacao = await api
+      .post('/api/auth/reautenticar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ senha: password })
+      .expect(200);
     await api
       .post('/api/usuarios')
       .set('Authorization', `Bearer ${token}`)
+      .set('X-Reautenticacao', confirmacao.body.token)
       .send({
         nome: 'Teste',
         email: `invalid-${marker}@example.test`,
@@ -289,6 +344,7 @@ describe('pipeline HTTP real em MySQL isolado', () => {
       .get(`/api/auth/me?secret=${password}`)
       .set('Authorization', `Bearer ${token}`)
       .set('X-Financeiro-Token', 'synthetic-financial-secret')
+      .set('X-Reautenticacao', 'synthetic-reauth-secret')
       .set('Cookie', 'session=synthetic-cookie-secret')
       .expect(200);
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -297,10 +353,194 @@ describe('pipeline HTTP real em MySQL isolado', () => {
       token,
       refreshToken,
       'synthetic-financial-secret',
+      'synthetic-reauth-secret',
       'synthetic-cookie-secret',
     ])
       expect(logs).not.toContain(secret);
     expect(logs).toContain('request completed');
+  });
+
+  it('aplica a matriz de acesso financeiro antes de qualquer efeito no banco', async () => {
+    const admin = `Bearer ${token}`;
+    const operador = await syntheticUser('OPERADOR');
+    const gerente = await syntheticUser('GERENTE');
+    const gerenteFinanceiro = await syntheticUser('GERENTE', true);
+    supplierId = (
+      await prisma.fornecedor.create({
+        data: {
+          nomeRazaoSocial: 'Fornecedor HTTP',
+          cpfCnpj: `h${marker.slice(0, 18)}`,
+        },
+      })
+    ).id;
+    const compra = await api
+      .post('/api/compras')
+      .set('Authorization', operador.bearer)
+      .send({
+        fornecedorId: supplierId,
+        itens: [{ produtoId: productId, quantidade: 1, valorUnitario: 10 }],
+      })
+      .expect(201);
+    purchaseIds.push(compra.body.id);
+    const status = async () =>
+      (await prisma.compra.findUniqueOrThrow({ where: { id: compra.body.id } }))
+        .status;
+
+    // Senha financeira compartilhada não existe mais.
+    await api
+      .post('/api/financeiro/desbloquear')
+      .set('Authorization', admin)
+      .send({ senha: 'qualquer' })
+      .expect(404);
+
+    // Visualizar: admin e gerente autorizado; gerente comum e operador não.
+    for (const bearer of [operador.bearer, gerente.bearer]) {
+      const negado = await api
+        .get('/api/financeiro/resumo')
+        .set('Authorization', bearer)
+        .expect(403);
+      expect(negado.body.error.code).toBe('ACESSO_FINANCEIRO_NEGADO');
+      const dashboard = await api
+        .get('/api/dashboard')
+        .set('Authorization', bearer)
+        .expect(200);
+      expect(dashboard.body.contagens.despesasAPagar).toBeNull();
+      expect(dashboard.body.contagens.receitasAReceber).toBeNull();
+    }
+    for (const bearer of [admin, gerenteFinanceiro.bearer]) {
+      await api
+        .get('/api/financeiro/resumo')
+        .set('Authorization', bearer)
+        .expect(200);
+      const dashboard = await api
+        .get('/api/dashboard')
+        .set('Authorization', bearer)
+        .expect(200);
+      expect(dashboard.body.contagens.despesasAPagar).not.toBeNull();
+    }
+
+    // Caminho alternativo por compras: sem permissão, nada muda.
+    for (const bearer of [operador.bearer, gerente.bearer]) {
+      await api
+        .patch(`/api/compras/${compra.body.id}/pagar`)
+        .set('Authorization', bearer)
+        .send({})
+        .expect(403);
+      await api
+        .patch(`/api/compras/${compra.body.id}/cancelar`)
+        .set('Authorization', bearer)
+        .expect(403);
+    }
+    expect(await status()).toBe('A_PAGAR');
+
+    // Com permissão, ainda falta confirmar a própria senha.
+    const semSenha = await api
+      .patch(`/api/compras/${compra.body.id}/pagar`)
+      .set('Authorization', gerenteFinanceiro.bearer)
+      .send({})
+      .expect(403);
+    expect(semSenha.body.error.code).toBe('REAUTENTICACAO_NECESSARIA');
+    await api
+      .post('/api/auth/reautenticar')
+      .set('Authorization', gerenteFinanceiro.bearer)
+      .send({ senha: 'senha-errada' })
+      .expect(400);
+    // Confirmação feita por outro usuário não serve.
+    const deOutro = await api
+      .post('/api/auth/reautenticar')
+      .set('Authorization', gerente.bearer)
+      .send({ senha: password })
+      .expect(200);
+    await api
+      .patch(`/api/compras/${compra.body.id}/pagar`)
+      .set('Authorization', gerenteFinanceiro.bearer)
+      .set('X-Reautenticacao', deOutro.body.token)
+      .send({})
+      .expect(403);
+    expect(await status()).toBe('A_PAGAR');
+
+    const confirmacao = await api
+      .post('/api/auth/reautenticar')
+      .set('Authorization', gerenteFinanceiro.bearer)
+      .send({ senha: password })
+      .expect(200);
+    // O token de confirmação não vale como access token.
+    await api
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${confirmacao.body.token}`)
+      .expect(401);
+    await api
+      .patch(`/api/compras/${compra.body.id}/pagar`)
+      .set('Authorization', gerenteFinanceiro.bearer)
+      .set('X-Reautenticacao', confirmacao.body.token)
+      .send({})
+      .expect(200);
+    expect(await status()).toBe('PAGO');
+
+    // Estornar o recebimento é da gestão.
+    await api
+      .patch(`/api/compras/${compra.body.id}/desconfirmar`)
+      .set('Authorization', operador.bearer)
+      .expect(403);
+  });
+
+  it('impede operador de inativar pela edição e restringe a gestão de usuários', async () => {
+    const operador = await syntheticUser('OPERADOR');
+    await api
+      .patch(`/api/categorias/${categoryId}`)
+      .set('Authorization', operador.bearer)
+      .send({ ativo: false })
+      .expect(403);
+    expect(
+      (await prisma.categoria.findUniqueOrThrow({ where: { id: categoryId } }))
+        .ativo,
+    ).toBe(true);
+    // A mesma edição sem o campo ativo continua liberada ao operador.
+    await api
+      .patch(`/api/categorias/${categoryId}`)
+      .set('Authorization', operador.bearer)
+      .send({ nome: `HTTP ${marker} editada` })
+      .expect(200);
+
+    await api
+      .patch(`/api/usuarios/${operador.id}/acesso`)
+      .set('Authorization', operador.bearer)
+      .send({ cargo: 'ADMINISTRADOR' })
+      .expect(403);
+    const admin = `Bearer ${token}`;
+    const semSenha = await api
+      .patch(`/api/usuarios/${operador.id}/acesso`)
+      .set('Authorization', admin)
+      .send({ cargo: 'GERENTE', acessoFinanceiro: true })
+      .expect(403);
+    expect(semSenha.body.error.code).toBe('REAUTENTICACAO_NECESSARIA');
+    expect(
+      (await prisma.usuario.findUniqueOrThrow({ where: { id: operador.id } }))
+        .cargo,
+    ).toBe('OPERADOR');
+
+    const confirmacao = await api
+      .post('/api/auth/reautenticar')
+      .set('Authorization', admin)
+      .send({ senha: password })
+      .expect(200);
+    await api
+      .patch(`/api/usuarios/${operador.id}/acesso`)
+      .set('Authorization', admin)
+      .set('X-Reautenticacao', confirmacao.body.token)
+      .send({ cargo: 'OPERADOR', acessoFinanceiro: true })
+      .expect(400);
+    const promovido = await api
+      .patch(`/api/usuarios/${operador.id}/acesso`)
+      .set('Authorization', admin)
+      .set('X-Reautenticacao', confirmacao.body.token)
+      .send({ cargo: 'GERENTE', acessoFinanceiro: true })
+      .expect(200);
+    expect(promovido.body).toMatchObject({
+      cargo: 'GERENTE',
+      acessoFinanceiro: true,
+    });
+    expect(promovido.body).not.toHaveProperty('senha');
   });
 
   it('bloqueia tentativas de login após o limite específico de dez por minuto', async () => {

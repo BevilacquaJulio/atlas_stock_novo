@@ -9,9 +9,11 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { LoginDto, RefreshDto } from './dto/auth.dto';
+import { LoginDto, ReautenticarDto, RefreshDto } from './dto/auth.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { TODOS_OS_CARGOS } from '../../common/auth/permissoes';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 @ApiTags('auth')
@@ -43,8 +45,22 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @Roles(...TODOS_OS_CARGOS)
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
+  }
+
+  /** Confirma a própria senha para liberar ações críticas por alguns minutos. */
+  @ApiBearerAuth()
+  @Roles(...TODOS_OS_CARGOS)
+  @Post('reautenticar')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  reautenticar(
+    @Body() dto: ReautenticarDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.service.reautenticar(user, dto.senha);
   }
 }

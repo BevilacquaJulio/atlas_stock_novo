@@ -1,17 +1,26 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UsuariosRepository } from '../usuarios/usuarios.repository';
 import { RefreshTokenRepository } from './refresh-token.repository';
-import { jwtPolicy, refreshClaimsSchema } from '../../common/auth/jwt-policy';
+import {
+  jwtPolicy,
+  REAUTENTICACAO_TTL_SEGUNDOS,
+  refreshClaimsSchema,
+} from '../../common/auth/jwt-policy';
+import { temAcessoFinanceiro } from '../../common/auth/permissoes';
 import type {
   AuthenticatedUser,
   JwtAccessPayload,
   JwtRefreshPayload,
 } from '../../common/types/authenticated-user';
-import type { Prisma } from '../../../generated/prisma/client';
+import type { Cargo, Prisma } from '../../../generated/prisma/client';
 
 export interface TokenPair {
   accessToken: string;
@@ -78,6 +87,37 @@ export class AuthService {
     return tokens;
   }
 
+  /**
+   * Confirma a senha do próprio usuário e emite um token curto exigido pelas
+   * ações críticas (pagamentos, estornos, gestão de acessos). Senha errada
+   * responde 400, não 401: a sessão continua válida.
+   */
+  async reautenticar(
+    user: AuthenticatedUser,
+    senha: string,
+  ): Promise<{ token: string; expiresIn: number }> {
+    const usuario = await this.usuarios.findByIdWithSenha(user.id);
+    const confere = await bcrypt.compare(
+      senha,
+      usuario?.senha ?? dummyPasswordHash,
+    );
+    if (!usuario?.ativo || !confere) {
+      throw new BadRequestException('Senha incorreta.');
+    }
+    const token = await this.jwt.signAsync(
+      { purpose: 'reautenticacao', sub: user.id },
+      {
+        issuer: jwtPolicy.issuer,
+        audience: jwtPolicy.audience,
+        algorithm: 'HS256',
+        secret: this.config.get<string>('JWT_ACCESS_SECRET'),
+        expiresIn: REAUTENTICACAO_TTL_SEGUNDOS,
+        jwtid: randomUUID(),
+      },
+    );
+    return { token, expiresIn: REAUTENTICACAO_TTL_SEGUNDOS };
+  }
+
   async logout(refreshToken: string): Promise<void> {
     let payload: JwtRefreshPayload;
     try {
@@ -114,12 +154,19 @@ export class AuthService {
     }
   }
 
-  private publicUser(user: AuthenticatedUser): AuthenticatedUser {
+  private publicUser(user: {
+    id: number;
+    nome: string;
+    email: string;
+    cargo: Cargo;
+    acessoFinanceiro: boolean;
+  }): AuthenticatedUser {
     return {
       id: user.id,
       nome: user.nome,
       email: user.email,
       cargo: user.cargo,
+      acessoFinanceiro: temAcessoFinanceiro(user),
     };
   }
 

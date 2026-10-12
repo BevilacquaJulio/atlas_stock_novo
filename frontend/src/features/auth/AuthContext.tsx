@@ -10,7 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CanceledError } from 'axios';
 import { SESSION_EXPIRED_EVENT } from '../../lib/api';
 import { tokenStore } from '../../lib/token-store';
-import { financeiroUnlockStore } from '../../lib/financeiro-unlock';
+import { reautenticacaoStore } from '../../lib/reautenticacao';
 import { loginRequest, logoutRequest, restoreSession } from './auth.api';
 import type { AuthUser } from './auth.types';
 
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearPrivateState = useCallback(() => {
     tokenStore.clear();
-    financeiroUnlockStore.clear();
+    reautenticacaoStore.clear();
     void queryClient.cancelQueries();
     queryClient.clear();
     setUser(null);

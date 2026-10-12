@@ -4,8 +4,9 @@ export interface DashboardContagens {
   projetosAtivos: number;
   projetosEmAndamento: number;
   comprasAPagar: number;
-  despesasAPagar: { quantidade: number; total: string | number };
-  receitasAReceber: { quantidade: number; total: string | number };
+  /** `null` para quem não tem acesso financeiro (a API nem consulta). */
+  despesasAPagar: { quantidade: number; total: string | number } | null;
+  receitasAReceber: { quantidade: number; total: string | number } | null;
   produtosEstoqueBaixo: Array<{
     id: number;
     codigo: string;

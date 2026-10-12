@@ -68,9 +68,9 @@ Playwright usa o build da API e o bundle real do frontend, sem mock de rede:
 - Login inválido/válido, renovação após reload, logout e troca de perfil.
 - Cadastro de cliente: criação, edição e inativação.
 - Estoque: entrada, saída e recusa de saída sem saldo.
-- Compra: criação, pagamento, recebimento, estorno do recebimento, estorno do pagamento e cancelamento; saldo e despesa conferidos pela API real.
+- Compra: criação, pagamento (com confirmação da senha do usuário), recebimento, estorno do recebimento, estorno do pagamento e cancelamento; saldo e despesa conferidos pela API real.
 - Projeto: criação com cliente/veículo, status, checklist, consumo de produto e conclusão; saldo conferido.
-- Financeiro: senha incorreta/correta, despesa/pagamento, receita/recebimento e limpeza do desbloqueio no logout.
+- Financeiro: gerente autorizado acessa sem senha compartilhada; baixas pedem a senha do próprio usuário (incorreta/correta); despesa/pagamento, receita/recebimento; operador sem acesso, inclusive após trocar de conta.
 
 Um worker, com retries desativados, mantém as falhas visíveis. Cada teste cria fixtures próprias,
 remove somente seus registros e usa credenciais sintéticas. O guard recusa

@@ -6,25 +6,9 @@ import type {
   DespesaFormValues,
   FinanceiroQuery,
   FinanceiroResumo,
-  FinanceiroStatus,
   Receita,
   ReceitaFormValues,
 } from './financeiro.types';
-
-export async function getFinanceiroStatus(): Promise<FinanceiroStatus> {
-  const { data } = await api.get<FinanceiroStatus>('/financeiro/status');
-  return data;
-}
-
-export async function desbloquearFinanceiro(
-  senha: string,
-): Promise<{ token: string | null; expiresIn: string | null }> {
-  const { data } = await api.post<{ token: string | null; expiresIn: string | null }>(
-    '/financeiro/desbloquear',
-    { senha },
-  );
-  return data;
-}
 
 export async function getFinanceiroResumo(): Promise<FinanceiroResumo> {
   const { data } = await api.get<FinanceiroResumo>('/financeiro/resumo');

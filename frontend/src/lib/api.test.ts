@@ -2,7 +2,10 @@ import axios, { AxiosError, AxiosHeaders, type AxiosResponse, type InternalAxios
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, refreshAccessToken, SESSION_EXPIRED_EVENT } from './api';
 import { tokenStore } from './token-store';
-import { financeiroUnlockStore } from './financeiro-unlock';
+import {
+  reautenticacaoStore,
+  registrarSolicitanteReautenticacao,
+} from './reautenticacao';
 
 const originalApiAdapter = api.defaults.adapter;
 const originalAdapter = axios.defaults.adapter;
@@ -27,7 +30,7 @@ afterEach(() => {
   api.defaults.adapter = originalApiAdapter;
   axios.defaults.adapter = originalAdapter;
   tokenStore.clear();
-  financeiroUnlockStore.clear();
+  reautenticacaoStore.clear();
 });
 
 describe('sessão no cliente HTTP', () => {
@@ -85,16 +88,16 @@ describe('sessão no cliente HTTP', () => {
     await assertion;
   });
 
-  it('falha de refresh encerra a sessão uma vez e limpa desbloqueio', async () => {
+  it('falha de refresh encerra a sessão uma vez e limpa a confirmação de senha', async () => {
     const listener = vi.fn();
     window.addEventListener(SESSION_EXPIRED_EVENT, listener);
-    financeiroUnlockStore.set('synthetic-financial-token');
+    reautenticacaoStore.set('synthetic-reauth-token', 600);
     api.defaults.adapter = async (config) => unauthorized(config);
     axios.defaults.adapter = async (config) => unauthorized(config);
     await Promise.allSettled([api.get('/private/a'), api.get('/private/b')]);
     expect(listener).toHaveBeenCalledTimes(1);
     expect(tokenStore.getAccess()).toBeNull();
-    expect(financeiroUnlockStore.get()).toBeNull();
+    expect(reautenticacaoStore.get()).toBeNull();
     window.removeEventListener(SESSION_EXPIRED_EVENT, listener);
   });
 
@@ -104,5 +107,68 @@ describe('sessão no cliente HTTP', () => {
     await expect(api.get('https://outside.example.test/api/private')).rejects.toThrow('Destino fora');
     await expect(api.get('/private', { baseURL: 'https://outside.example.test/api' })).rejects.toThrow('Destino fora');
     expect(adapter).not.toHaveBeenCalled();
+  });
+});
+
+function precisaSenha(config: InternalAxiosRequestConfig): never {
+  throw new AxiosError('Forbidden', 'ERR_BAD_REQUEST', config, undefined, {
+    ...response(config, {
+      error: { code: 'REAUTENTICACAO_NECESSARIA', message: 'Confirme sua senha.' },
+    }),
+    status: 403,
+  });
+}
+
+describe('confirmação de senha nas ações críticas', () => {
+  it('pede a senha uma vez, repete as ações e envia o token só depois da confirmação', async () => {
+    const pedir = vi.fn(async () => {
+      reautenticacaoStore.set('synthetic-reauth', 600);
+      return true;
+    });
+    const remover = registrarSolicitanteReautenticacao(pedir);
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => {
+      if (config.headers['X-Reautenticacao'] !== 'synthetic-reauth') precisaSenha(config);
+      return response(config, { ok: true });
+    });
+    api.defaults.adapter = adapter;
+
+    const [a, b] = await Promise.all([
+      api.patch('/compras/1/pagar', {}),
+      api.patch('/compras/2/pagar', {}),
+    ]);
+
+    expect(a.data.ok && b.data.ok).toBe(true);
+    expect(pedir).toHaveBeenCalledTimes(1);
+    expect(adapter).toHaveBeenCalledTimes(4);
+    remover();
+  });
+
+  it('se a pessoa cancelar, a ação falha sem nova tentativa', async () => {
+    const remover = registrarSolicitanteReautenticacao(async () => false);
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => precisaSenha(config));
+    api.defaults.adapter = adapter;
+
+    await expect(api.patch('/compras/1/pagar', {})).rejects.toMatchObject({
+      response: { status: 403 },
+    });
+    expect(adapter).toHaveBeenCalledTimes(1);
+    remover();
+  });
+
+  it('não envia a confirmação para a própria rota de reautenticação nem após trocar de sessão', async () => {
+    const headers: (string | undefined)[] = [];
+    api.defaults.adapter = vi.fn(async (config: InternalAxiosRequestConfig) => {
+      headers.push(config.headers['X-Reautenticacao'] as string | undefined);
+      return response(config, {});
+    });
+    reautenticacaoStore.set('synthetic-reauth', 600);
+
+    await api.post('/auth/reautenticar', { senha: 'x' });
+    await api.get('/financeiro/resumo');
+    tokenStore.clear();
+    tokenStore.setAccess('outra-conta');
+    await api.get('/financeiro/resumo');
+
+    expect(headers).toEqual([undefined, 'synthetic-reauth', undefined]);
   });
 });

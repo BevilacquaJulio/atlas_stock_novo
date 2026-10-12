@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { UsuariosRepository } from '../usuarios/usuarios.repository';
@@ -49,6 +49,8 @@ describe('AuthService.login', () => {
     expect(result.accessToken).toBe('signed.jwt.token');
     expect(result.refreshToken).toBe('signed.jwt.token');
     expect(result.user).toMatchObject({ id: 1, cargo: 'ADMINISTRADOR' });
+    // Permissão efetiva: administrador sempre tem acesso financeiro.
+    expect(result.user.acessoFinanceiro).toBe(true);
   });
 
   it('rejeita senha incorreta com 401', async () => {
@@ -75,5 +77,60 @@ describe('AuthService.login', () => {
     await expect(service.login('a@b.com', 'x')).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+});
+
+describe('AuthService.reautenticar', () => {
+  const user = {
+    id: 3,
+    nome: 'Gerente',
+    email: 'g@b.com',
+    cargo: 'GERENTE' as const,
+    acessoFinanceiro: true,
+  };
+  let usuarios: { findByIdWithSenha: ReturnType<typeof vi.fn> };
+  let jwt: { signAsync: ReturnType<typeof vi.fn> };
+  let service: AuthService;
+
+  beforeEach(async () => {
+    usuarios = {
+      findByIdWithSenha: vi.fn().mockResolvedValue({
+        id: 3,
+        ativo: true,
+        senha: await bcrypt.hash('senha-do-gerente', 4),
+      }),
+    };
+    jwt = { signAsync: vi.fn().mockResolvedValue('token.reautenticacao') };
+    service = new AuthService(
+      usuarios as unknown as UsuariosRepository,
+      {} as RefreshTokenRepository,
+      jwt as never,
+      { get: vi.fn().mockReturnValue('segredo') } as never,
+    );
+  });
+
+  it('emite token curto de reautenticação para a própria senha', async () => {
+    const result = await service.reautenticar(user, 'senha-do-gerente');
+
+    expect(result).toEqual({ token: 'token.reautenticacao', expiresIn: 600 });
+    expect(jwt.signAsync).toHaveBeenCalledWith(
+      { purpose: 'reautenticacao', sub: 3 },
+      expect.objectContaining({ expiresIn: 600, algorithm: 'HS256' }),
+    );
+  });
+
+  it('senha errada ou usuário inativo respondem 400 sem emitir token', async () => {
+    await expect(service.reautenticar(user, 'errada')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    usuarios.findByIdWithSenha.mockResolvedValue({
+      id: 3,
+      ativo: false,
+      senha: await bcrypt.hash('senha-do-gerente', 4),
+    });
+    await expect(
+      service.reautenticar(user, 'senha-do-gerente'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(jwt.signAsync).not.toHaveBeenCalled();
   });
 });

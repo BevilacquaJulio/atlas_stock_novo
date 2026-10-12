@@ -15,3 +15,10 @@ export const refreshSchema = z
   })
   .strict();
 export class RefreshDto extends createZodDto(refreshSchema) {}
+
+export const reautenticarSchema = z
+  .object({
+    senha: z.string().min(1).max(1024),
+  })
+  .strict();
+export class ReautenticarDto extends createZodDto(reautenticarSchema) {}

@@ -4,7 +4,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { getApiErrorMessage } from '../../lib/api';
-import { financeiroUnlockStore } from '../../lib/financeiro-unlock';
 import { formatBRL, formatDate } from '../../lib/format';
 import { PageHeader } from '../../components/PageHeader';
 import { ListToolbar, TableContainer } from '../../components/ListToolbar';
@@ -17,24 +16,18 @@ import { FilterTabs } from '../../components/FilterTabs';
 import { TextField } from '../../components/form/TextField';
 import { SelectField } from '../../components/form/SelectField';
 import { IconPlus } from '../../components/icons';
-import { useAuth } from '../auth/useAuth';
+import { usePermissoes } from '../auth/permissoes';
 import {
   useCategoriasDespesa,
   useCreateDespesa,
   useCreateReceita,
-  useDesbloquearFinanceiro,
   useDespesas,
   useFinanceiroResumo,
-  useFinanceiroStatus,
   usePagarDespesa,
   useReceberReceita,
   useReceitas,
 } from './financeiro.hooks';
 import type { Despesa, DespesaFormValues, Receita, ReceitaFormValues } from './financeiro.types';
-
-const unlockSchema = z.object({
-  senha: z.string().min(1, 'Informe a senha.'),
-});
 
 const despesaSchema = z.object({
   descricao: z.string().trim().min(1),
@@ -50,14 +43,8 @@ const receitaSchema = z.object({
 });
 
 export default function FinanceiroPage() {
-  const { user } = useAuth();
-  const statusQuery = useFinanceiroStatus();
-  const desbloquearMut = useDesbloquearFinanceiro();
-
-  const isAdmin = user?.cargo === 'ADMINISTRADOR';
-  const hasToken = !!financeiroUnlockStore.get();
-  const unlocked =
-    isAdmin || hasToken || statusQuery.data?.desbloqueado === true;
+  // Acesso nominal: administrador ou gerente autorizado (a API confere).
+  const unlocked = usePermissoes().financeiro;
 
   const [tab, setTab] = useState<'despesas' | 'receitas'>('despesas');
   const [page, setPage] = useState(1);
@@ -93,9 +80,6 @@ export default function FinanceiroPage() {
   const pagarMut = usePagarDespesa();
   const receberMut = useReceberReceita();
 
-  const unlockForm = useForm<z.infer<typeof unlockSchema>>({
-    resolver: zodResolver(unlockSchema),
-  });
   const despesaForm = useForm<z.infer<typeof despesaSchema>>({
     resolver: zodResolver(despesaSchema),
     defaultValues: { valor: 0 },
@@ -104,15 +88,6 @@ export default function FinanceiroPage() {
     resolver: zodResolver(receitaSchema),
     defaultValues: { valor: 0 },
   });
-
-  const handleUnlock = async (values: z.infer<typeof unlockSchema>) => {
-    setFormError(null);
-    try {
-      await desbloquearMut.mutateAsync(values.senha);
-    } catch (err) {
-      setFormError(getApiErrorMessage(err));
-    }
-  };
 
   const handleCreateDespesa = async (values: DespesaFormValues) => {
     setFormError(null);
@@ -136,41 +111,14 @@ export default function FinanceiroPage() {
     }
   };
 
-  if (statusQuery.isLoading) return <Spinner />;
-
   if (!unlocked) {
     return (
       <>
-        <PageHeader
-          title="Financeiro"
-          subtitle="Módulo protegido. Informe a senha de desbloqueio."
+        <PageHeader title="Financeiro" />
+        <EmptyState
+          title="Sem acesso ao financeiro"
+          description="O financeiro é liberado ao administrador e a gerentes autorizados por ele."
         />
-        <div className="mx-auto max-w-md rounded-md border border-[#e5e5e5] bg-white p-6">
-          {formError && (
-            <div className="mb-4">
-              <Alert kind="error">{formError}</Alert>
-            </div>
-          )}
-          <form
-            onSubmit={unlockForm.handleSubmit(handleUnlock)}
-            className="flex flex-col gap-4"
-          >
-            <TextField
-              label="Senha financeira"
-              type="password"
-              autoComplete="current-password"
-              error={unlockForm.formState.errors.senha?.message}
-              {...unlockForm.register('senha')}
-            />
-            <Button type="submit" loading={desbloquearMut.isPending}>
-              Desbloquear
-            </Button>
-          </form>
-          <p className="mt-4 text-xs text-[#0a0a0a]/45">
-            Administradores acessam sem senha adicional. Demais usuários usam a
-            senha fornecida pelo administrador.
-          </p>
-        </div>
       </>
     );
   }

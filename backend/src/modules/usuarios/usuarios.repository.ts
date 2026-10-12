@@ -9,6 +9,7 @@ export const usuarioSelect = {
   email: true,
   cargo: true,
   ativo: true,
+  acessoFinanceiro: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UsuarioSelect;
@@ -36,13 +37,49 @@ export class UsuariosRepository {
     });
   }
 
+  /** Inclui a senha (hash) — uso restrito à reautenticação. */
+  findByIdWithSenha(id: number) {
+    return this.prisma.usuario.findUnique({
+      where: { id },
+      select: { id: true, ativo: true, senha: true },
+    });
+  }
+
   create(data: {
     nome: string;
     email: string;
     senha: string;
     cargo: Cargo;
+    acessoFinanceiro: boolean;
   }) {
     return this.prisma.usuario.create({ data, select: usuarioSelect });
+  }
+
+  runInTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) {
+    return this.prisma.$transaction(fn);
+  }
+
+  /**
+   * Trava os administradores ativos até o fim da transação e devolve os ids.
+   * Alterações simultâneas de acesso ficam em fila e não conseguem, juntas,
+   * deixar o sistema sem administrador.
+   */
+  async travarAdministradoresAtivos(
+    tx: Prisma.TransactionClient,
+  ): Promise<number[]> {
+    const rows = await tx.$queryRaw<{ id: number }[]>`
+      SELECT id FROM usuarios
+      WHERE cargo = 'ADMINISTRADOR' AND ativo = true
+      FOR UPDATE`;
+    return rows.map((row) => Number(row.id));
+  }
+
+  update(
+    id: number,
+    data: { cargo: Cargo; ativo: boolean; acessoFinanceiro: boolean },
+    tx: Prisma.TransactionClient,
+  ) {
+    return tx.usuario.update({ where: { id }, data, select: usuarioSelect });
   }
 
   async list() {

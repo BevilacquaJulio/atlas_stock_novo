@@ -5,6 +5,8 @@ export interface AuthUser {
   nome: string;
   email: string;
   cargo: Cargo;
+  /** Permissão financeira efetiva, calculada pela API. */
+  acessoFinanceiro: boolean;
 }
 
 export interface LoginResponse {

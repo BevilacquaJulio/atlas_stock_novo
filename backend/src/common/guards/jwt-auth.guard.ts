@@ -11,6 +11,7 @@ import type { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { UsuariosRepository } from '../../modules/usuarios/usuarios.repository';
 import { accessClaimsSchema, jwtPolicy } from '../auth/jwt-policy';
+import { temAcessoFinanceiro } from '../auth/permissoes';
 import type {
   AuthenticatedUser,
 } from '../types/authenticated-user';
@@ -54,6 +55,7 @@ export class JwtAuthGuard implements CanActivate {
         nome: usuario.nome,
         email: usuario.email,
         cargo: usuario.cargo,
+        acessoFinanceiro: temAcessoFinanceiro(usuario),
       };
     } catch {
       throw new UnauthorizedException('Token de acesso inválido ou expirado.');

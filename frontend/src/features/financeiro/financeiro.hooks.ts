@@ -2,50 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createDespesa,
   createReceita,
-  desbloquearFinanceiro,
   getFinanceiroResumo,
-  getFinanceiroStatus,
   listCategoriasDespesa,
   listDespesas,
   listReceitas,
   pagarDespesa,
   receberReceita,
 } from './financeiro.api';
-import { financeiroUnlockStore } from '../../lib/financeiro-unlock';
-import { tokenStore } from '../../lib/token-store';
 import type {
   DespesaFormValues,
   FinanceiroQuery,
   ReceitaFormValues,
 } from './financeiro.types';
 
-const STATUS_KEY = ['financeiro', 'status'];
 const RESUMO_KEY = ['financeiro', 'resumo'];
 const DESPESAS_KEY = ['financeiro', 'despesas'];
 const RECEITAS_KEY = ['financeiro', 'receitas'];
-
-export function useFinanceiroStatus() {
-  return useQuery({
-    queryKey: STATUS_KEY,
-    queryFn: getFinanceiroStatus,
-  });
-}
-
-export function useDesbloquearFinanceiro() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (senha: string) => {
-      const generation = tokenStore.getGeneration();
-      const data = await desbloquearFinanceiro(senha);
-      return { ...data, generation };
-    },
-    onSuccess: (data) => {
-      if (data.generation !== tokenStore.getGeneration()) return;
-      if (data.token) financeiroUnlockStore.set(data.token);
-      qc.invalidateQueries({ queryKey: ['financeiro'] });
-    },
-  });
-}
 
 export function useFinanceiroResumo(enabled: boolean) {
   return useQuery({

@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class DashboardRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getCounts() {
+  async getCounts(incluirFinanceiro: boolean) {
     const [
       clientes,
       produtos,
@@ -23,16 +23,20 @@ export class DashboardRepository {
         where: { ativo: true, status: 'EM_ANDAMENTO' },
       }),
       this.prisma.compra.count({ where: { status: 'A_PAGAR' } }),
-      this.prisma.despesa.aggregate({
-        where: { status: 'A_PAGAR' },
-        _sum: { valor: true },
-        _count: true,
-      }),
-      this.prisma.receita.aggregate({
-        where: { status: 'A_RECEBER' },
-        _sum: { valor: true },
-        _count: true,
-      }),
+      incluirFinanceiro
+        ? this.prisma.despesa.aggregate({
+            where: { status: 'A_PAGAR' },
+            _sum: { valor: true },
+            _count: true,
+          })
+        : null,
+      incluirFinanceiro
+        ? this.prisma.receita.aggregate({
+            where: { status: 'A_RECEBER' },
+            _sum: { valor: true },
+            _count: true,
+          })
+        : null,
       this.prisma.produto.findMany({
         where: { ativo: true, quantidadeEstoque: { lte: 5 } },
         take: 10,
@@ -53,11 +57,11 @@ export class DashboardRepository {
       projetosAtivos,
       projetosEmAndamento,
       comprasAPagar,
-      despesasAPagar: {
+      despesasAPagar: despesasAPagar && {
         quantidade: despesasAPagar._count,
         total: despesasAPagar._sum.valor ?? 0,
       },
-      receitasAReceber: {
+      receitasAReceber: receitasAReceber && {
         quantidade: receitasAReceber._count,
         total: receitasAReceber._sum.valor ?? 0,
       },

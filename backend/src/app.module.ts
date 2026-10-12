@@ -23,7 +23,7 @@ import { ComprasModule } from './modules/compras/compras.module';
 import { ProjetosModule } from './modules/projetos/projetos.module';
 import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
-import { FinanceiroUnlockGuard } from './common/guards/financeiro-unlock.guard';
+import { PermissoesGuard } from './common/guards/permissoes.guard';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 
 @Module({
@@ -68,7 +68,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
-    { provide: APP_GUARD, useClass: FinanceiroUnlockGuard },
+    { provide: APP_GUARD, useClass: PermissoesGuard },
   ],
 })
 export class AppModule {}

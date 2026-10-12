@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { Prisma } from '../../../generated/prisma/client';
 import type {
@@ -27,24 +26,6 @@ const receitaInclude = {
 @Injectable()
 export class FinanceiroRepository {
   constructor(private readonly prisma: PrismaService) {}
-
-  getConfig() {
-    return this.prisma.configSistema.findUnique({ where: { id: 1 } });
-  }
-
-  upsertConfigFinanceiroSenha(hash: string) {
-    return this.prisma.configSistema.upsert({
-      where: { id: 1 },
-      update: { financeiroSenhaHash: hash },
-      create: { id: 1, financeiroSenhaHash: hash },
-    });
-  }
-
-  async verifyFinanceiroSenha(senha: string): Promise<boolean> {
-    const config = await this.getConfig();
-    if (!config?.financeiroSenhaHash) return false;
-    return bcrypt.compare(senha, config.financeiroSenhaHash);
-  }
 
   async findDespesas(
     where: Prisma.DespesaWhereInput,

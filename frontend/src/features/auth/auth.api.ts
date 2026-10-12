@@ -29,3 +29,14 @@ export async function logoutRequest(refreshToken = tokenStore.getRefresh()): Pro
     await api.post('/auth/logout', { refreshToken }).catch(() => undefined);
   }
 }
+
+/** Confirma a senha do próprio usuário para liberar ações críticas. */
+export async function reautenticarRequest(
+  senha: string,
+): Promise<{ token: string; expiresIn: number }> {
+  const { data } = await api.post<{ token: string; expiresIn: number }>(
+    '/auth/reautenticar',
+    { senha },
+  );
+  return data;
+}

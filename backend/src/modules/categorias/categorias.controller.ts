@@ -16,9 +16,12 @@ import { CategoriasService } from './categorias.service';
 import { CreateCategoriaDto, UpdateCategoriaDto } from './dto/categoria.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { TODOS_OS_CARGOS } from '../../common/auth/permissoes';
+import { InativacaoRestrita } from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('categorias')
 @ApiBearerAuth()
+@Roles(...TODOS_OS_CARGOS)
 @Controller('categorias')
 export class CategoriasController {
   constructor(private readonly service: CategoriasService) {}
@@ -39,6 +42,7 @@ export class CategoriasController {
   }
 
   @Patch(':id')
+  @InativacaoRestrita()
   update(
     @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateCategoriaDto,

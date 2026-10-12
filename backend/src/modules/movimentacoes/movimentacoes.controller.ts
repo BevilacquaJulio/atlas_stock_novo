@@ -7,9 +7,12 @@ import {
 } from './dto/movimentacao.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { TODOS_OS_CARGOS } from '../../common/auth/permissoes';
 
 @ApiTags('movimentacoes')
 @ApiBearerAuth()
+@Roles(...TODOS_OS_CARGOS)
 @Controller('movimentacoes')
 export class MovimentacoesController {
   constructor(private readonly service: MovimentacoesService) {}

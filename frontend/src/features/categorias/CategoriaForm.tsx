@@ -1,3 +1,4 @@
+import { semCampoAtivo, usePermissoes } from '../auth/permissoes';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,6 +24,7 @@ export function CategoriaForm({
   onSubmit: (values: CategoriaFormValues) => void;
   error?: string | null;
 }) {
+  const { gestao } = usePermissoes();
   const {
     register,
     handleSubmit,
@@ -39,7 +41,9 @@ export function CategoriaForm({
   return (
     <form
       id="categoria-form"
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit((values) =>
+        onSubmit(gestao ? values : semCampoAtivo(values)),
+      )}
       className="flex flex-col gap-4"
     >
       {error && <Alert kind="error">{error}</Alert>}
@@ -53,11 +57,13 @@ export function CategoriaForm({
         error={errors.descricao?.message}
         {...register('descricao')}
       />
-      <SwitchField
-        label="Ativo"
-        description="Categorias inativas ficam ocultas em novos cadastros."
-        {...register('ativo')}
-      />
+      {gestao && (
+        <SwitchField
+          label="Ativo"
+          description="Categorias inativas ficam ocultas em novos cadastros."
+          {...register('ativo')}
+        />
+      )}
     </form>
   );
 }

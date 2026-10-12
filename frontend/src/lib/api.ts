@@ -4,7 +4,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import { tokenStore } from './token-store';
-import { financeiroUnlockStore } from './financeiro-unlock';
+import { reautenticacaoStore, solicitarReautenticacao } from './reautenticacao';
 
 const baseURL = (import.meta.env.VITE_API_URL?.trim() || 'http://localhost:3000/api').replace(/\/+$/, '');
 const trustedBase = new URL(baseURL, window.location.origin);
@@ -17,7 +17,16 @@ export const SESSION_EXPIRED_EVENT = 'g5:session-expired';
 
 interface SessionConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
+  _reautenticado?: boolean;
   _sessionGeneration?: number;
+}
+
+/** Código que a API usa quando a ação crítica precisa da senha do usuário. */
+const REAUTENTICACAO_NECESSARIA = 'REAUTENTICACAO_NECESSARIA';
+
+function codigoDoErro(error: AxiosError): string | undefined {
+  return (error.response?.data as { error?: { code?: string } } | undefined)
+    ?.error?.code;
 }
 
 function target(config: SessionConfig): URL {
@@ -45,11 +54,9 @@ api.interceptors.request.use((config: SessionConfig) => {
   if (token && !publicAuth(config)) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  if (url.pathname.startsWith(`${trustedBase.pathname}/financeiro/`) && !url.pathname.endsWith('/desbloquear')) {
-    const finToken = financeiroUnlockStore.get();
-    if (finToken) {
-      config.headers['X-Financeiro-Token'] = finToken;
-    }
+  const confirmacao = reautenticacaoStore.get();
+  if (confirmacao && !publicAuth(config) && url.pathname !== `${trustedBase.pathname}/auth/reautenticar`) {
+    config.headers['X-Reautenticacao'] = confirmacao;
   }
   return config;
 });
@@ -109,9 +116,33 @@ api.interceptors.response.use(
       } catch {
         if (original._sessionGeneration === tokenStore.getGeneration()) {
           tokenStore.clear();
-          financeiroUnlockStore.clear();
+          reautenticacaoStore.clear();
           window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
         }
+      }
+    }
+
+    // Ação crítica: pede a senha do próprio usuário e repete a requisição uma
+    // vez. Se a pessoa cancelar, a ação falha com a mensagem da API.
+    if (
+      error.response?.status === 403 &&
+      codigoDoErro(error) === REAUTENTICACAO_NECESSARIA &&
+      original &&
+      !original._reautenticado
+    ) {
+      const enviada = original.headers['X-Reautenticacao'];
+      const atual = reautenticacaoStore.get();
+      // Outra ação já confirmou a senha depois deste envio: só repete.
+      if (atual && atual !== enviada) {
+        original._reautenticado = true;
+        return api(original);
+      }
+      // A confirmação enviada foi recusada (expirou): descarta e pede de novo.
+      reautenticacaoStore.clear();
+      if (await solicitarReautenticacao()) {
+        ensureSession(original._sessionGeneration);
+        original._reautenticado = true;
+        return api(original);
       }
     }
     return Promise.reject(error);

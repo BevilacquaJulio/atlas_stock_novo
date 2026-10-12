@@ -23,6 +23,7 @@ const MovimentacoesPage = lazy(
 );
 const ComprasPage = lazy(() => import('../features/compras/ComprasPage'));
 const ProjetosPage = lazy(() => import('../features/projetos/ProjetosPage'));
+const UsuariosPage = lazy(() => import('../features/usuarios/UsuariosPage'));
 const ProjetoDetalhesPage = lazy(
   () => import('../features/projetos/ProjetoDetalhesPage'),
 );
@@ -63,6 +64,7 @@ export function App() {
           <Route path="projetos" element={<ProjetosPage />} />
           <Route path="projetos/:id" element={<ProjetoDetalhesPage />} />
           <Route path="financeiro" element={<FinanceiroPage />} />
+          <Route path="usuarios" element={<UsuariosPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

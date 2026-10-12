@@ -1,3 +1,4 @@
+import { semCampoAtivo, usePermissoes } from '../auth/permissoes';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -36,6 +37,7 @@ export function VeiculoForm({
     queryFn: () => listClientes({ limit: 100, ativo: true }),
   });
 
+  const { gestao } = usePermissoes();
   const {
     register,
     handleSubmit,
@@ -63,7 +65,9 @@ export function VeiculoForm({
   return (
     <form
       id="veiculo-form"
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit((values) =>
+        onSubmit(gestao ? values : semCampoAtivo(values)),
+      )}
       className="flex flex-col gap-4"
     >
       {error && <Alert kind="error">{error}</Alert>}
@@ -99,11 +103,13 @@ export function VeiculoForm({
         label="Observações técnicas"
         {...register('observacoesTecnicas')}
       />
-      <SwitchField
-        label="Ativo"
-        description="Veículos inativos não podem ser usados em novos projetos."
-        {...register('ativo')}
-      />
+      {gestao && (
+        <SwitchField
+          label="Ativo"
+          description="Veículos inativos não podem ser usados em novos projetos."
+          {...register('ativo')}
+        />
+      )}
     </form>
   );
 }

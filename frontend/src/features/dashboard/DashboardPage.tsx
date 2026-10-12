@@ -88,21 +88,23 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-2">
-        <StatCard
-          label="Despesas a pagar"
-          value={formatBRL(String(contagens.despesasAPagar.total))}
-          hint={`${contagens.despesasAPagar.quantidade} pendente(s)`}
-          Icon={IconDollar}
-          accent
-        />
-        <StatCard
-          label="Receitas a receber"
-          value={formatBRL(String(contagens.receitasAReceber.total))}
-          hint={`${contagens.receitasAReceber.quantidade} pendente(s)`}
-          Icon={IconDollar}
-        />
-      </div>
+      {contagens.despesasAPagar && contagens.receitasAReceber && (
+        <div className="mb-8 grid gap-4 sm:grid-cols-2">
+          <StatCard
+            label="Despesas a pagar"
+            value={formatBRL(String(contagens.despesasAPagar.total))}
+            hint={`${contagens.despesasAPagar.quantidade} pendente(s)`}
+            Icon={IconDollar}
+            accent
+          />
+          <StatCard
+            label="Receitas a receber"
+            value={formatBRL(String(contagens.receitasAReceber.total))}
+            hint={`${contagens.receitasAReceber.quantidade} pendente(s)`}
+            Icon={IconDollar}
+          />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section>

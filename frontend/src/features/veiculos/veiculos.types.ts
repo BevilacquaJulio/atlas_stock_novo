@@ -21,5 +21,6 @@ export interface VeiculoFormValues {
   ano?: string | null;
   cor?: string | null;
   observacoesTecnicas?: string | null;
-  ativo: boolean;
+  /** Só a gestão envia; ausente = não altera. */
+  ativo?: boolean;
 }

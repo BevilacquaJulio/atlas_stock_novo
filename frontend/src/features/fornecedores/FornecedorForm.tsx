@@ -1,3 +1,4 @@
+import { semCampoAtivo, usePermissoes } from '../auth/permissoes';
 import { useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,6 +39,7 @@ export function FornecedorForm({
   onSubmit: (values: FornecedorFormValues) => void;
   error?: string | null;
 }) {
+  const { gestao } = usePermissoes();
   const {
     register,
     handleSubmit,
@@ -63,7 +65,9 @@ export function FornecedorForm({
   return (
     <form
       id="fornecedor-form"
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleSubmit((values) =>
+        onSubmit(gestao ? values : semCampoAtivo(values)),
+      )}
       className="flex flex-col gap-4"
     >
       {error && <Alert kind="error">{error}</Alert>}
@@ -96,11 +100,13 @@ export function FornecedorForm({
         error={errors.email?.message}
         {...register('email')}
       />
-      <SwitchField
-        label="Ativo"
-        description="Fornecedores inativos não podem ser usados em novas compras."
-        {...register('ativo')}
-      />
+      {gestao && (
+        <SwitchField
+          label="Ativo"
+          description="Fornecedores inativos não podem ser usados em novas compras."
+          {...register('ativo')}
+        />
+      )}
     </form>
   );
 }

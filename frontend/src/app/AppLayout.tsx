@@ -2,6 +2,8 @@ import { Suspense, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../features/auth/useAuth';
+import { usePermissoes } from '../features/auth/permissoes';
+import { ReautenticacaoDialog } from '../components/ReautenticacaoDialog';
 import { Spinner } from '../components/feedback';
 import { BrandLogo } from '../components/BrandLogo';
 import { UserSessionBar } from '../components/UserSessionBar';
@@ -15,6 +17,7 @@ import {
   IconDollar,
   IconMenu,
   IconClose,
+  IconShield,
   IconSwap,
   IconTag,
   IconTruck,
@@ -22,10 +25,14 @@ import {
 } from '../components/icons';
 import type { ComponentType, SVGProps } from 'react';
 
+type Permissoes = ReturnType<typeof usePermissoes>;
+
 interface NavItem {
   to: string;
   label: string;
   Icon: ComponentType<SVGProps<SVGSVGElement>>;
+  /** Esconde o item de quem a API vai recusar (a regra real fica na API). */
+  visivel?: (permissoes: Permissoes) => boolean;
 }
 
 const principalNav: NavItem[] = [
@@ -37,7 +44,21 @@ const operacoesNav: NavItem[] = [
   { to: '/compras', label: 'Compras', Icon: IconCart },
   { to: '/projetos', label: 'Projetos', Icon: IconClipboard },
   { to: '/cadastros/movimentacoes', label: 'Movimentações', Icon: IconSwap },
-  { to: '/financeiro', label: 'Financeiro', Icon: IconDollar }
+  {
+    to: '/financeiro',
+    label: 'Financeiro',
+    Icon: IconDollar,
+    visivel: (p) => p.financeiro,
+  },
+];
+
+const administracaoNav: NavItem[] = [
+  {
+    to: '/usuarios',
+    label: 'Usuários',
+    Icon: IconShield,
+    visivel: (p) => p.administrador,
+  },
 ];
 
 const cadastrosNav: NavItem[] = [
@@ -168,6 +189,7 @@ export function AppLayout() {
           </div>
         </main>
       </div>
+      <ReautenticacaoDialog />
     </div>
   );
 }
@@ -185,12 +207,15 @@ function NavGroup({
   scope: string;
   onNavigate?: () => void;
 }) {
+  const permissoes = usePermissoes();
+  const visiveis = items.filter((item) => item.visivel?.(permissoes) ?? true);
+  if (visiveis.length === 0) return null;
   return (
     <>
       <p className="mt-5 px-3 py-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[#0a0a0a]/40 first:mt-0">
         {title}
       </p>
-      {items.map(({ to, label, Icon }) => {
+      {visiveis.map(({ to, label, Icon }) => {
         const isActive = to === '/' ? activePath === '/' : activePath.startsWith(to);
         return (
           <NavLink
@@ -250,6 +275,13 @@ function SidebarContent({
       <NavGroup
         title="Cadastros"
         items={cadastrosNav}
+        activePath={activePath}
+        scope={scope}
+        onNavigate={onNavigate}
+      />
+      <NavGroup
+        title="Administração"
+        items={administracaoNav}
         activePath={activePath}
         scope={scope}
         onNavigate={onNavigate}

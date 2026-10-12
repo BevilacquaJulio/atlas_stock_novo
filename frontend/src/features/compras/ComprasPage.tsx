@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { usePermissoes } from '../auth/permissoes';
 import { getApiErrorMessage } from '../../lib/api';
 import { formatBRL, formatDate } from '../../lib/format';
 import { PageHeader } from '../../components/PageHeader';
@@ -72,6 +73,8 @@ function CompraActions({
   onEstornarPagamento: (c: Compra) => void;
   onCancelar: (c: Compra) => void;
 }) {
+  // A API recusa o que não for permitido; aqui só escondemos o botão.
+  const { financeiro, gestao } = usePermissoes();
   const size = compact ? 'sm' : 'md';
   const wrap = compact
     ? 'flex flex-wrap items-center justify-end gap-1'
@@ -84,7 +87,7 @@ function CompraActions({
           Detalhes
         </Button>
       )}
-      {compra.status === 'A_PAGAR' && (
+      {compra.status === 'A_PAGAR' && financeiro && (
         <>
           <Button size={size} loading={loading} onClick={() => onPagar(compra)}>
             Pagar
@@ -104,25 +107,29 @@ function CompraActions({
           <Button size={size} loading={loading} onClick={() => onConfirmar(compra)}>
             {compact ? 'Confirmar' : 'Confirmar recebimento'}
           </Button>
-          <Button
-            variant="ghost"
-            size={size}
-            loading={loading}
-            onClick={() => onEstornarPagamento(compra)}
-          >
-            {compact ? 'Estornar' : 'Estornar pagamento'}
-          </Button>
-          <Button
-            variant="ghost"
-            size={size}
-            loading={loading}
-            onClick={() => onCancelar(compra)}
-          >
-            Cancelar
-          </Button>
+          {financeiro && (
+            <>
+              <Button
+                variant="ghost"
+                size={size}
+                loading={loading}
+                onClick={() => onEstornarPagamento(compra)}
+              >
+                {compact ? 'Estornar' : 'Estornar pagamento'}
+              </Button>
+              <Button
+                variant="ghost"
+                size={size}
+                loading={loading}
+                onClick={() => onCancelar(compra)}
+              >
+                Cancelar
+              </Button>
+            </>
+          )}
         </>
       )}
-      {compra.status === 'CONFIRMADA' && (
+      {compra.status === 'CONFIRMADA' && gestao && (
         <Button
           variant="ghost"
           size={size}

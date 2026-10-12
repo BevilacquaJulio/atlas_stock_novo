@@ -70,6 +70,14 @@ describe('pagamento e recebimento de compras', () => {
         }),
         f.tx,
       );
+      // Só o estorno desfaz a entrada no custo médio.
+      expect(
+        f.movements.registrar.mock.calls.map(
+          ([input]) => input.estornoDeEntrada,
+        ),
+      ).toEqual(
+        operation === 'confirmar' ? [undefined, undefined] : [true, true],
+      );
       expect(f.repo.transition).toHaveBeenCalledWith(
         f.tx,
         1,
@@ -93,7 +101,11 @@ describe('pagamento e recebimento de compras', () => {
     expect(f.movements.registrar).not.toHaveBeenCalled();
   });
 
-  it.each(['ESTOQUE_INSUFICIENTE', 'PRODUTO_NAO_ENCONTRADO'])(
+  it.each([
+    'ESTOQUE_INSUFICIENTE',
+    'CUSTO_MEDIO_INVALIDO',
+    'PRODUTO_NAO_ENCONTRADO',
+  ])(
     'propaga falha de negócio %s sem retornar confirmação',
     async (message) => {
       const f = fixture('CONFIRMADA');

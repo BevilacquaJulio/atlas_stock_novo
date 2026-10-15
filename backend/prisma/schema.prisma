@@ -73,22 +73,28 @@ enum ProjetoConsumoTipo {
 // ───────────────────────────── Autenticação ──────────────────────────
 
 model Usuario {
-  id        Int      @id @default(autoincrement())
-  nome      String   @db.VarChar(150)
-  email     String   @unique @db.VarChar(180)
-  senha     String   @map("senha") @db.VarChar(255) // hash bcrypt
-  cargo     Cargo    @default(OPERADOR)
-  ativo     Boolean  @default(true)
+  id               Int      @id @default(autoincrement())
+  nome             String   @db.VarChar(150)
+  email            String   @unique @db.VarChar(180)
+  senha            String   @map("senha") @db.VarChar(255) // hash bcrypt
+  cargo            Cargo    @default(OPERADOR)
+  ativo            Boolean  @default(true)
   /// Permissão financeira explícita. Só vale para GERENTE: administrador
   /// sempre tem acesso e operador nunca tem (ver common/auth/permissoes.ts).
-  acessoFinanceiro Boolean @default(false) @map("acesso_financeiro")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  acessoFinanceiro Boolean  @default(false) @map("acesso_financeiro")
+  createdAt        DateTime @default(now()) @map("criado_em")
+  updatedAt        DateTime @updatedAt @map("atualizado_em")
 
-  movimentacoes Movimentacao[]
-  refreshTokens RefreshToken[]
-  compras       Compra[]
-  projetos      Projeto[]
+  movimentacoes    Movimentacao[]
+  refreshTokens    RefreshToken[]
+  sessoes          Sessao[]
+  recuperacoes     RecuperacaoSenha[]
+  mfaSegredo       String?            @map("mfa_segredo") @db.Text
+  mfaAtivo         Boolean            @default(false) @map("mfa_ativo")
+  mfaUltimoPasso   Int                @default(0) @map("mfa_ultimo_passo")
+  mfaRecuperacao   Json?              @map("mfa_recuperacao")
+  compras          Compra[]
+  projetos         Projeto[]
   projetoHistorico ProjetoHistorico[]
   projetoConsumos  ProjetoConsumo[]
 
@@ -98,15 +104,19 @@ model Usuario {
 model RefreshToken {
   id        Int       @id @default(autoincrement())
   usuarioId Int       @map("usuario_id")
-  tokenHash String    @map("token_hash") @db.VarChar(255)
-  expiresAt DateTime  @map("expires_at")
-  revokedAt DateTime? @map("revoked_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  sessaoId  String?   @map("sessao_id") @db.VarChar(36)
+  sessao    Sessao?   @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+  tokenHash String    @map("resumo_token") @db.VarChar(255)
+  expiresAt DateTime  @map("expira_em")
+  revokedAt DateTime? @map("revogado_em")
+  createdAt DateTime  @default(now()) @map("criado_em")
 
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([usuarioId])
-  @@map("refresh_tokens")
+  @@index([tokenHash])
+  @@index([sessaoId])
+  @@map("tokens_renovacao")
 }
 
 // ─────────────────────────────── Cadastros ───────────────────────────
@@ -116,8 +126,8 @@ model Categoria {
   nome      String   @unique @db.VarChar(120)
   descricao String?  @db.Text
   ativo     Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("criado_em")
+  updatedAt DateTime @updatedAt @map("atualizado_em")
 
   produtos Produto[]
 
@@ -137,13 +147,13 @@ model Produto {
   escopo            ProdutoEscopo @default(GERAL)
   projetoId         Int?          @map("projeto_id") // FK adicionada na fase de Projetos
   ativo             Boolean       @default(true)
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
+  createdAt         DateTime      @default(now()) @map("criado_em")
+  updatedAt         DateTime      @updatedAt @map("atualizado_em")
 
-  categoria     Categoria?     @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-  projeto       Projeto?       @relation(fields: [projetoId], references: [id], onDelete: SetNull)
-  movimentacoes Movimentacao[]
-  compraItens   CompraItem[]
+  categoria       Categoria?       @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  projeto         Projeto?         @relation(fields: [projetoId], references: [id], onDelete: SetNull)
+  movimentacoes   Movimentacao[]
+  compraItens     CompraItem[]
   projetoConsumos ProjetoConsumo[]
 
   @@index([categoriaId])
@@ -159,8 +169,8 @@ model Fornecedor {
   telefone        String?  @db.VarChar(30)
   email           String?  @db.VarChar(180)
   ativo           Boolean  @default(true)
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt       DateTime @default(now()) @map("criado_em")
+  updatedAt       DateTime @updatedAt @map("atualizado_em")
 
   compras  Compra[]
   despesas Despesa[]
@@ -185,8 +195,8 @@ model Cliente {
   estado       String?     @db.VarChar(2)
   observacoes  String?     @db.Text
   ativo        Boolean     @default(true)
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  createdAt    DateTime    @default(now()) @map("criado_em")
+  updatedAt    DateTime    @updatedAt @map("atualizado_em")
 
   veiculos Veiculo[]
   projetos Projeto[]
@@ -197,19 +207,19 @@ model Cliente {
 }
 
 model Veiculo {
-  id                   Int      @id @default(autoincrement())
-  clienteId            Int      @map("cliente_id")
-  placa                String   @db.VarChar(10)
-  marca                String   @db.VarChar(80)
-  modelo               String   @db.VarChar(120)
-  ano                  String?  @db.VarChar(10)
-  cor                  String?  @db.VarChar(40)
-  observacoesTecnicas  String?  @map("observacoes_tecnicas") @db.Text
-  ativo                Boolean  @default(true)
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                  Int      @id @default(autoincrement())
+  clienteId           Int      @map("cliente_id")
+  placa               String   @db.VarChar(10)
+  marca               String   @db.VarChar(80)
+  modelo              String   @db.VarChar(120)
+  ano                 String?  @db.VarChar(10)
+  cor                 String?  @db.VarChar(40)
+  observacoesTecnicas String?  @map("observacoes_tecnicas") @db.Text
+  ativo               Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("criado_em")
+  updatedAt           DateTime @updatedAt @map("atualizado_em")
 
-  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cliente  Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   projetos Projeto[]
 
   @@index([clienteId])
@@ -230,9 +240,9 @@ model Movimentacao {
   usuarioId        Int              @map("usuario_id")
   dataMovimentacao DateTime         @default(now()) @map("data_movimentacao")
 
-  produto Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
-  usuario Usuario @relation(fields: [usuarioId], references: [id])
-  compra  Compra? @relation(fields: [compraId], references: [id], onDelete: SetNull)
+  produto Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  usuario Usuario  @relation(fields: [usuarioId], references: [id])
+  compra  Compra?  @relation(fields: [compraId], references: [id], onDelete: SetNull)
   projeto Projeto? @relation(fields: [projetoId], references: [id], onDelete: SetNull)
 
   @@index([produtoId])
@@ -247,14 +257,14 @@ model Movimentacao {
 model Compra {
   id            Int          @id @default(autoincrement())
   fornecedorId  Int          @map("fornecedor_id")
-  status        CompraStatus @default(A_PAGAR)
+  status        CompraStatus @default(A_PAGAR) @map("situacao")
   dataCompra    DateTime     @default(now()) @map("data_compra")
   dataPagamento DateTime?    @map("data_pagamento")
   valorTotal    Decimal      @default(0) @map("valor_total") @db.Decimal(12, 2)
   observacoes   String?      @db.Text
   usuarioId     Int          @map("usuario_id")
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
+  createdAt     DateTime     @default(now()) @map("criado_em")
+  updatedAt     DateTime     @updatedAt @map("atualizado_em")
 
   fornecedor    Fornecedor     @relation(fields: [fornecedorId], references: [id])
   usuario       Usuario        @relation(fields: [usuarioId], references: [id])
@@ -281,28 +291,28 @@ model CompraItem {
 
   @@index([compraId])
   @@index([produtoId])
-  @@map("compra_itens")
+  @@map("itens_compras")
 }
 
 // Despesa vinculada a compra ou avulsa; módulo financeiro completo na Fase 4.
 model Despesa {
-  id                Int           @id @default(autoincrement())
-  descricao         String        @db.VarChar(200)
-  valor             Decimal       @db.Decimal(12, 2)
-  status            DespesaStatus @default(A_PAGAR)
-  dataVencimento    DateTime?     @map("data_vencimento")
-  dataPagamento     DateTime?     @map("data_pagamento")
-  fornecedorId      Int?          @map("fornecedor_id")
-  categoriaDespesaId Int?         @map("categoria_despesa_id")
-  compraId          Int?          @unique @map("compra_id")
-  projetoId         Int?          @map("projeto_id")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
+  id                 Int           @id @default(autoincrement())
+  descricao          String        @db.VarChar(200)
+  valor              Decimal       @db.Decimal(12, 2)
+  status             DespesaStatus @default(A_PAGAR) @map("situacao")
+  dataVencimento     DateTime?     @map("data_vencimento")
+  dataPagamento      DateTime?     @map("data_pagamento")
+  fornecedorId       Int?          @map("fornecedor_id")
+  categoriaDespesaId Int?          @map("categoria_despesa_id")
+  compraId           Int?          @unique @map("compra_id")
+  projetoId          Int?          @map("projeto_id")
+  createdAt          DateTime      @default(now()) @map("criado_em")
+  updatedAt          DateTime      @updatedAt @map("atualizado_em")
 
-  fornecedor       Fornecedor?      @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
+  fornecedor       Fornecedor?       @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
   categoriaDespesa CategoriaDespesa? @relation(fields: [categoriaDespesaId], references: [id], onDelete: SetNull)
-  compra           Compra?          @relation(fields: [compraId], references: [id], onDelete: Cascade)
-  projeto          Projeto?         @relation(fields: [projetoId], references: [id], onDelete: SetNull)
+  compra           Compra?           @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  projeto          Projeto?          @relation(fields: [projetoId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([categoriaDespesaId])
@@ -316,7 +326,7 @@ model Projeto {
   id            Int           @id @default(autoincrement())
   clienteId     Int           @map("cliente_id")
   veiculoId     Int           @map("veiculo_id")
-  status        ProjetoStatus @default(AGUARDANDO)
+  status        ProjetoStatus @default(AGUARDANDO) @map("situacao")
   descricao     String?       @db.Text
   valorOrcado   Decimal       @default(0) @map("valor_orcado") @db.Decimal(12, 2)
   valorFinal    Decimal?      @map("valor_final") @db.Decimal(12, 2)
@@ -324,8 +334,8 @@ model Projeto {
   dataConclusao DateTime?     @map("data_conclusao")
   usuarioId     Int           @map("usuario_id")
   ativo         Boolean       @default(true)
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  createdAt     DateTime      @default(now()) @map("criado_em")
+  updatedAt     DateTime      @updatedAt @map("atualizado_em")
 
   cliente       Cliente                @relation(fields: [clienteId], references: [id])
   veiculo       Veiculo                @relation(fields: [veiculoId], references: [id])
@@ -352,13 +362,13 @@ model ProjetoChecklistItem {
   concluido   Boolean   @default(false)
   ordem       Int       @default(0)
   concluidoEm DateTime? @map("concluido_em")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt   DateTime  @default(now()) @map("criado_em")
+  updatedAt   DateTime  @updatedAt @map("atualizado_em")
 
   projeto Projeto @relation(fields: [projetoId], references: [id], onDelete: Cascade)
 
   @@index([projetoId])
-  @@map("projeto_checklist_itens")
+  @@map("itens_verificacao_projetos")
 }
 
 model ProjetoHistorico {
@@ -368,13 +378,13 @@ model ProjetoHistorico {
   statusNovo     ProjetoStatus  @map("status_novo")
   observacao     String?        @db.Text
   usuarioId      Int            @map("usuario_id")
-  createdAt      DateTime       @default(now()) @map("created_at")
+  createdAt      DateTime       @default(now()) @map("criado_em")
 
   projeto Projeto @relation(fields: [projetoId], references: [id], onDelete: Cascade)
   usuario Usuario @relation(fields: [usuarioId], references: [id])
 
   @@index([projetoId])
-  @@map("projeto_historico")
+  @@map("historicos_projetos")
 }
 
 model ProjetoConsumo {
@@ -387,7 +397,7 @@ model ProjetoConsumo {
   valorUnitario Decimal            @map("valor_unitario") @db.Decimal(12, 2)
   valorTotal    Decimal            @map("valor_total") @db.Decimal(12, 2)
   usuarioId     Int                @map("usuario_id")
-  createdAt     DateTime           @default(now()) @map("created_at")
+  createdAt     DateTime           @default(now()) @map("criado_em")
 
   projeto Projeto  @relation(fields: [projetoId], references: [id], onDelete: Cascade)
   produto Produto? @relation(fields: [produtoId], references: [id], onDelete: SetNull)
@@ -395,7 +405,7 @@ model ProjetoConsumo {
 
   @@index([projetoId])
   @@index([produtoId])
-  @@map("projeto_consumos")
+  @@map("consumos_projetos")
 }
 
 // ─────────────────────────────── Financeiro ────────────────────────
@@ -404,25 +414,25 @@ model CategoriaDespesa {
   id        Int      @id @default(autoincrement())
   nome      String   @unique @db.VarChar(120)
   ativo     Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("criado_em")
+  updatedAt DateTime @updatedAt @map("atualizado_em")
 
   despesas Despesa[]
 
-  @@map("categoria_despesa")
+  @@map("categorias_despesas")
 }
 
 model Receita {
   id              Int           @id @default(autoincrement())
   descricao       String        @db.VarChar(200)
   valor           Decimal       @db.Decimal(12, 2)
-  status          ReceitaStatus @default(A_RECEBER)
+  status          ReceitaStatus @default(A_RECEBER) @map("situacao")
   dataVencimento  DateTime?     @map("data_vencimento")
   dataRecebimento DateTime?     @map("data_recebimento")
   clienteId       Int?          @map("cliente_id")
   projetoId       Int?          @map("projeto_id")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  createdAt       DateTime      @default(now()) @map("criado_em")
+  updatedAt       DateTime      @updatedAt @map("atualizado_em")
 
   cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   projeto Projeto? @relation(fields: [projetoId], references: [id], onDelete: SetNull)
@@ -439,7 +449,58 @@ model Receita {
 model ConfigSistema {
   id                  Int      @id @default(1)
   financeiroSenhaHash String?  @map("financeiro_senha_hash") @db.VarChar(255)
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  updatedAt           DateTime @updatedAt @map("atualizado_em")
 
-  @@map("config_sistema")
+  @@map("configuracoes_sistema")
+}
+
+model Sessao {
+  id         String         @id @db.VarChar(36)
+  usuarioId  Int            @map("usuario_id")
+  criadoEm   DateTime       @default(now()) @map("criado_em")
+  expiraEm   DateTime       @map("expira_em")
+  revogadoEm DateTime?      @map("revogado_em")
+  usuario    Usuario        @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tokens     RefreshToken[]
+
+  @@index([usuarioId])
+  @@map("sessoes")
+}
+
+model RecuperacaoSenha {
+  id          Int       @id @default(autoincrement())
+  usuarioId   Int       @map("usuario_id")
+  resumoToken String    @unique @map("resumo_token") @db.VarChar(64)
+  criadoEm    DateTime  @default(now()) @map("criado_em")
+  expiraEm    DateTime  @map("expira_em")
+  usadoEm     DateTime? @map("usado_em")
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("recuperacoes_senha")
+}
+
+model EventoAuditoria {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int?     @map("usuario_id")
+  acao      String   @db.VarChar(16)
+  recurso   String   @db.VarChar(200)
+  resultado Int
+  requestId String   @map("request_id") @db.VarChar(36)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  @@index([criadoEm])
+  @@map("eventos_auditoria")
+}
+
+model RequisicaoIdempotente {
+  id            Int      @id @default(autoincrement())
+  usuarioId     Int      @map("usuario_id")
+  chave         String   @db.VarChar(36)
+  resumoEntrada String   @map("resumo_entrada") @db.VarChar(64)
+  resposta      Json?
+  criadoEm      DateTime @default(now()) @map("criado_em")
+
+  @@unique([usuarioId, chave])
+  @@map("requisicoes_idempotentes")
 }

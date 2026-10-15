@@ -28,7 +28,7 @@ const makeMovimentacoesRepo = () => ({
 });
 
 const makePrisma = () => ({
-  $transaction: vi.fn((fn: (tx: unknown) => unknown) => fn({})),
+  withAudit: vi.fn((fn: (tx: unknown) => unknown) => fn({})),
 });
 
 describe('ComprasService', () => {

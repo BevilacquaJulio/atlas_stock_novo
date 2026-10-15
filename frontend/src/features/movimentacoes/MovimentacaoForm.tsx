@@ -1,11 +1,10 @@
+import { RemoteSelectField } from '../../components/form/RemoteSelectField';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
 import { TextField } from '../../components/form/TextField';
 import { SelectField } from '../../components/form/SelectField';
 import { Alert } from '../../components/feedback';
-import { listProdutos } from '../produtos/produtos.api';
 import type { MovimentacaoFormValues } from './movimentacoes.types';
 
 const schema = z.object({
@@ -24,11 +23,6 @@ export function MovimentacaoForm({
   onSubmit: (values: MovimentacaoFormValues) => void;
   error?: string | null;
 }) {
-  const produtosQuery = useQuery({
-    queryKey: ['produtos', 'options'],
-    queryFn: () => listProdutos({ limit: 100, ativo: true }),
-  });
-
   const {
     register,
     handleSubmit,
@@ -38,12 +32,6 @@ export function MovimentacaoForm({
     defaultValues: { tipo: 'ENTRADA', quantidade: 1 },
   });
 
-  const produtoOptions =
-    produtosQuery.data?.data.map((p) => ({
-      value: p.id,
-      label: `${p.codigo} — ${p.nome}`,
-    })) ?? [];
-
   return (
     <form
       id="movimentacao-form"
@@ -51,13 +39,11 @@ export function MovimentacaoForm({
       className="flex flex-col gap-4"
     >
       {error && <Alert kind="error">{error}</Alert>}
-      <SelectField
+      <RemoteSelectField
         label="Produto"
-        placeholder={
-          produtosQuery.isLoading ? 'Carregando…' : 'Selecione o produto'
-        }
+        placeholder="Selecione"
         error={errors.produtoId?.message}
-        options={produtoOptions}
+        source="produtos"
         {...register('produtoId')}
       />
       <div className="grid gap-4 sm:grid-cols-2">

@@ -1,0 +1,3 @@
+-- Execute como DBA; a conta de restauração é outra e exige autorização específica.
+CREATE USER IF NOT EXISTS 'atlas_backup'@'%' IDENTIFIED BY 'TROQUE_SENHA_BACKUP';
+GRANT SELECT, SHOW VIEW, TRIGGER ON atlas_estoque.* TO 'atlas_backup'@'%';

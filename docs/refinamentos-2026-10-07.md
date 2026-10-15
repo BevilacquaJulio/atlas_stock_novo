@@ -22,16 +22,16 @@ backups ou imagens de produção. Não há garantia de ausência de outras falha
 
 ## Plano de implementação
 
-| Ordem | Tema | Gravidade | Branch | Estado |
-| --- | --- | --- | --- | --- |
-| 1 | Credenciais públicas e dados demo | Alta | `feat/remover-credenciais-demo` | Implementado; testes e builds aprovados |
-| 2 | Validação de identidade e rotação de tokens | Alta | `feat/endurecer-autenticacao` | Implementado; MySQL, testes e build aprovados |
-| 3 | Concorrência de estoque, compras e projetos | Alta | `feat/transacoes-estoque-compras` | Implementado; MySQL, testes e build aprovados |
-| 4 | Consistência dos pagamentos financeiros | Alta | `feat/consistencia-financeiro` | Implementado; MySQL, testes e builds aprovados |
-| 5 | Isolamento das sessões no frontend | Alta | `feat/isolar-sessoes-frontend` | Implementado; 13 testes, lint e build aprovados |
-| 6 | Limites de entrada, logs e configuração HTTP | Média/alta | `feat/validacao-http-segura` | Implementado; HTTP/MySQL, tipos, lint e builds aprovados |
-| 7 | Evolução de sessão, permissões e regras de produto | Alta | A definir juntos | **Reservado** |
-| 8 | Dependências, infraestrutura e qualidade de entrega | Alta | A definir juntos | **Reservado** |
+| Ordem | Tema                                                | Gravidade  | Branch                            | Estado                                                   |
+| ----- | --------------------------------------------------- | ---------- | --------------------------------- | -------------------------------------------------------- |
+| 1     | Credenciais públicas e dados demo                   | Alta       | `feat/remover-credenciais-demo`   | Implementado; testes e builds aprovados                  |
+| 2     | Validação de identidade e rotação de tokens         | Alta       | `feat/endurecer-autenticacao`     | Implementado; MySQL, testes e build aprovados            |
+| 3     | Concorrência de estoque, compras e projetos         | Alta       | `feat/transacoes-estoque-compras` | Implementado; MySQL, testes e build aprovados            |
+| 4     | Consistência dos pagamentos financeiros             | Alta       | `feat/consistencia-financeiro`    | Implementado; MySQL, testes e builds aprovados           |
+| 5     | Isolamento das sessões no frontend                  | Alta       | `feat/isolar-sessoes-frontend`    | Implementado; 13 testes, lint e build aprovados          |
+| 6     | Limites de entrada, logs e configuração HTTP        | Média/alta | `feat/validacao-http-segura`      | Implementado; HTTP/MySQL, tipos, lint e builds aprovados |
+| 7     | Evolução de sessão, permissões e regras de produto  | Alta       | A definir juntos                  | **Reservado**                                            |
+| 8     | Dependências, infraestrutura e qualidade de entrega | Alta       | A definir juntos                  | **Reservado**                                            |
 
 ## 1. Credenciais públicas e dados demo
 
@@ -293,14 +293,14 @@ validação. API real de produção, HTTPS e imagens finais não foram testados.
 
 ## Entregas por implementação
 
-| Tópico | PR | Commit de implementação |
-| --- | --- | --- |
-| 1 | [Remove credenciais públicas](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/1) | `6fe4c43` |
-| 2 | [Corrige validação e rotação de tokens](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/2) | `180016a` |
-| 3 | [Preserva estoque e status](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/3) | `7939b58` |
-| 4 | [Corrige pagamentos e recebimentos](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/4) | `d5e4ccb`, `2aba9bb` |
-| 5 | [Isola sessões e cache](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/5) | `0d6df08` |
-| 6 | [Reforça validação, limites HTTP e logs](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/6) | `ffaace5` |
+| Tópico | PR                                                                                                   | Commit de implementação |
+| ------ | ---------------------------------------------------------------------------------------------------- | ----------------------- |
+| 1      | [Remove credenciais públicas](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/1)            | `6fe4c43`               |
+| 2      | [Corrige validação e rotação de tokens](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/2)  | `180016a`               |
+| 3      | [Preserva estoque e status](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/3)              | `7939b58`               |
+| 4      | [Corrige pagamentos e recebimentos](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/4)      | `d5e4ccb`, `2aba9bb`    |
+| 5      | [Isola sessões e cache](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/5)                  | `0d6df08`               |
+| 6      | [Reforça validação, limites HTTP e logs](https://github.com/BevilacquaJulio/atlas_stock_novo/pull/6) | `ffaace5`               |
 
 PRs publicados pela conta autenticada `BevilacquaJulio`, com títulos e
 descrições normais e commits atribuídos a Julio. Os tópicos 7 e 8 continuam

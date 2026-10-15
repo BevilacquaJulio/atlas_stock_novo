@@ -1,0 +1,5 @@
+# Somente placeholders e fixtures sintéticas conferidas em 15/10/2026.
+ffaace5448d98168a3d5b6e3b58732efce476d39:backend/src/config/env.validation.spec.ts:generic-api-key:47
+180016a725bb49f1018404cdf3e31bcba33de75c:backend/src/config/env.validation.spec.ts:generic-api-key:14
+7f3e8b2ccadc1dd37166f4c4116128a33307f47d:.env.example:generic-api-key:34
+7f3e8b2ccadc1dd37166f4c4116128a33307f47d:backend/.env.example:generic-api-key:17

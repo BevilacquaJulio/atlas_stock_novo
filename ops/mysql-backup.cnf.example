@@ -1,0 +1,7 @@
+[client]
+host=mysql_shared
+port=3306
+user=atlas_backup
+password=TROQUE_SENHA_BACKUP
+ssl-mode=VERIFY_IDENTITY
+ssl-ca=/run/secrets/mysql-ca.pem

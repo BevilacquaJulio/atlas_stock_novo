@@ -12,9 +12,7 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { UsuariosRepository } from '../../modules/usuarios/usuarios.repository';
 import { accessClaimsSchema, jwtPolicy } from '../auth/jwt-policy';
 import { temAcessoFinanceiro } from '../auth/permissoes';
-import type {
-  AuthenticatedUser,
-} from '../types/authenticated-user';
+import type { AuthenticatedUser } from '../types/authenticated-user';
 
 /**
  * Guard global de autenticação. Valida o Bearer access token e anexa o
@@ -44,13 +42,19 @@ export class JwtAuthGuard implements CanActivate {
 
     let user: AuthenticatedUser;
     try {
-      const payload = accessClaimsSchema.parse(await this.jwtService.verifyAsync(
-        token,
-        { ...jwtPolicy, secret: this.config.get<string>('JWT_ACCESS_SECRET') },
-      ));
+      const payload = accessClaimsSchema.parse(
+        await this.jwtService.verifyAsync(token, {
+          ...jwtPolicy,
+          secret: this.config.get<string>('JWT_ACCESS_SECRET'),
+        }),
+      );
       const usuario = await this.usuarios.findById(payload.sub);
       if (!usuario?.ativo) throw new UnauthorizedException();
+      if (!(await this.usuarios.findSession(payload.sid, usuario.id)))
+        throw new UnauthorizedException();
       user = {
+        sessaoId: payload.sid,
+        mfaAtivo: usuario.mfaAtivo,
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,

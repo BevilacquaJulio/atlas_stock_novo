@@ -4,13 +4,22 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import { tokenStore } from './token-store';
+import { withSessionLock } from './session-lock';
 import { reautenticacaoStore, solicitarReautenticacao } from './reautenticacao';
 
-const baseURL = (import.meta.env.VITE_API_URL?.trim() || 'http://localhost:3000/api').replace(/\/+$/, '');
+const baseURL = (import.meta.env.VITE_API_URL?.trim() || '/api').replace(
+  /\/+$/,
+  '',
+);
 const trustedBase = new URL(baseURL, window.location.origin);
 
 /** Cliente HTTP central. Toda chamada à API passa por aqui. */
-export const api = axios.create({ baseURL, timeout: 15_000 });
+export const api = axios.create({
+  baseURL,
+  timeout: 15_000,
+  withCredentials: true,
+  headers: { 'X-Atlas-Client': 'web' },
+});
 
 /** Emitido quando a sessão expira de vez (refresh falhou). */
 export const SESSION_EXPIRED_EVENT = 'g5:session-expired';
@@ -19,6 +28,15 @@ interface SessionConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
   _reautenticado?: boolean;
   _sessionGeneration?: number;
+  _idempotencyFingerprint?: string;
+}
+
+const pendingKeys = new Map<string, string>();
+let keysGeneration = tokenStore.getGeneration();
+
+function completeOperation(config: SessionConfig) {
+  if (config._idempotencyFingerprint)
+    pendingKeys.delete(config._idempotencyFingerprint);
 }
 
 /** Código que a API usa quando a ação crítica precisa da senha do usuário. */
@@ -31,7 +49,10 @@ function codigoDoErro(error: AxiosError): string | undefined {
 
 function target(config: SessionConfig): URL {
   const url = new URL(api.getUri(config), window.location.origin);
-  if (url.origin !== trustedBase.origin || !url.pathname.startsWith(`${trustedBase.pathname}/`)) {
+  if (
+    url.origin !== trustedBase.origin ||
+    !url.pathname.startsWith(`${trustedBase.pathname}/`)
+  ) {
     throw new Error('Destino fora da API configurada.');
   }
   return url;
@@ -39,23 +60,54 @@ function target(config: SessionConfig): URL {
 
 function publicAuth(config: SessionConfig): boolean {
   const path = target(config).pathname;
-  return ['login', 'refresh', 'logout'].some((action) => path === `${trustedBase.pathname}/auth/${action}`);
+  return ['login', 'refresh', 'logout', 'recuperar'].some(
+    (action) => path === `${trustedBase.pathname}/auth/${action}`,
+  );
 }
 
 function ensureSession(generation: number | undefined): void {
-  if (generation !== tokenStore.getGeneration()) throw new CanceledError('A sessão mudou.');
+  if (generation !== tokenStore.getGeneration())
+    throw new CanceledError('A sessão mudou.');
 }
 
 api.interceptors.request.use((config: SessionConfig) => {
   const url = target(config);
-  if (config._sessionGeneration !== undefined) ensureSession(config._sessionGeneration);
+  if (config._sessionGeneration !== undefined)
+    ensureSession(config._sessionGeneration);
   config._sessionGeneration = tokenStore.getGeneration();
+  if (keysGeneration !== config._sessionGeneration) {
+    pendingKeys.clear();
+    keysGeneration = config._sessionGeneration;
+  }
+  if (
+    config.method === 'post' &&
+    /^\/api\/(compras|movimentacoes|financeiro\/(despesas|receitas)|projetos(?:\/\d+\/consumos)?)$/.test(
+      url.pathname,
+    ) &&
+    !config.headers['Idempotency-Key']
+  ) {
+    const fingerprint = `${config._sessionGeneration}:${url.pathname}:${JSON.stringify(config.data)}`;
+    const key = pendingKeys.get(fingerprint) ?? crypto.randomUUID();
+    pendingKeys.set(fingerprint, key);
+    config._idempotencyFingerprint = fingerprint;
+    config.headers['Idempotency-Key'] = key;
+  }
+  if (
+    config.method === 'post' &&
+    !url.pathname.startsWith(`${trustedBase.pathname}/auth/`) &&
+    !config.headers['Idempotency-Key']
+  )
+    config.headers['Idempotency-Key'] = crypto.randomUUID();
   const token = tokenStore.getAccess();
   if (token && !publicAuth(config)) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   const confirmacao = reautenticacaoStore.get();
-  if (confirmacao && !publicAuth(config) && url.pathname !== `${trustedBase.pathname}/auth/reautenticar`) {
+  if (
+    confirmacao &&
+    !publicAuth(config) &&
+    url.pathname !== `${trustedBase.pathname}/auth/reautenticar`
+  ) {
     config.headers['X-Reautenticacao'] = confirmacao;
   }
   return config;
@@ -75,26 +127,27 @@ export function refreshAccessToken(): Promise<string> {
 }
 
 async function performRefresh(generation: number): Promise<string> {
-  const refreshToken = tokenStore.getRefresh();
-  if (!refreshToken) throw new Error('Sem refresh token.');
-
-  // axios "cru" para não recair no interceptor e evitar loop.
-  const { data } = await axios.post<{
-    accessToken: string;
-    refreshToken: string;
-  }>(`${baseURL}/auth/refresh`, { refreshToken }, { timeout: 15_000 });
-
-  ensureSession(generation);
-  if (tokenStore.getRefresh() !== refreshToken) throw new CanceledError('A sessão mudou.');
-
-  tokenStore.setAccess(data.accessToken);
-  tokenStore.setRefresh(data.refreshToken);
-  return data.accessToken;
+  return withSessionLock(async () => {
+    ensureSession(generation);
+    const { data } = await axios.post<{ accessToken: string }>(
+      `${baseURL}/auth/refresh`,
+      {},
+      {
+        timeout: 15_000,
+        withCredentials: true,
+        headers: { 'X-Atlas-Client': 'web' },
+      },
+    );
+    ensureSession(generation);
+    tokenStore.setAccess(data.accessToken);
+    return data.accessToken;
+  });
 }
 
 api.interceptors.response.use(
   (response) => {
     ensureSession((response.config as SessionConfig)._sessionGeneration);
+    completeOperation(response.config as SessionConfig);
     return response;
   },
   async (error: AxiosError) => {
@@ -105,6 +158,7 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       original &&
       !original._retry &&
+      !target(original).pathname.endsWith('/auth/reautenticar') &&
       !publicAuth(original)
     ) {
       original._retry = true;
@@ -145,16 +199,30 @@ api.interceptors.response.use(
         return api(original);
       }
     }
+    if (
+      original &&
+      error.response &&
+      error.response.status < 500 &&
+      error.response.status !== 409
+    )
+      completeOperation(original);
     return Promise.reject(error);
   },
 );
 
 /** Extrai a mensagem do envelope de erro do backend `{ error: { code, message } }`. */
-export function getApiErrorMessage(error: unknown, fallback = 'Ocorreu um erro.'): string {
+export function getApiErrorMessage(
+  error: unknown,
+  fallback = 'Ocorreu um erro.',
+): string {
   if (error instanceof AxiosError) {
+    if (
+      !error.response &&
+      (error.config as SessionConfig | undefined)?._idempotencyFingerprint
+    )
+      return 'Não foi possível confirmar a operação. Consulte os registros antes de reenviar.';
     const data = error.response?.data as
-      | { error?: { message?: string } }
-      | undefined;
+      { error?: { message?: string } } | undefined;
     return data?.error?.message ?? error.message ?? fallback;
   }
   return fallback;

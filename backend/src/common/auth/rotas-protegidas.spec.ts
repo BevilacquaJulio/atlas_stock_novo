@@ -121,6 +121,7 @@ describe('matriz de acesso das rotas', () => {
         'GET /health',
         'GET /health/ready',
         'POST /auth/login',
+        'POST /auth/recuperar',
         'POST /auth/logout',
         'POST /auth/refresh',
       ].sort(),

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { itemTotal, sumMoney } from '../../common/money';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CompraStatus, Prisma } from '../../../generated/prisma/client';
 import type { CreateCompraInput } from './dto/compra.dto';
@@ -8,7 +9,9 @@ const compraInclude = {
   usuario: { select: { id: true, nome: true } },
   itens: {
     include: {
-      produto: { select: { id: true, codigo: true, nome: true, unidadeMedida: true } },
+      produto: {
+        select: { id: true, codigo: true, nome: true, unidadeMedida: true },
+      },
     },
   },
   despesa: { select: { id: true, status: true, valor: true } },
@@ -18,11 +21,7 @@ const compraInclude = {
 export class ComprasRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findMany(
-    where: Prisma.CompraWhereInput,
-    skip: number,
-    take: number,
-  ) {
+  async findMany(where: Prisma.CompraWhereInput, skip: number, take: number) {
     const [data, total] = await Promise.all([
       this.prisma.compra.findMany({
         where,
@@ -55,14 +54,28 @@ export class ComprasRepository {
     });
   }
 
-  async transition(tx: Prisma.TransactionClient, id: number, expected: CompraStatus, data: Prisma.CompraUpdateManyMutationInput) {
-    const { count } = await tx.compra.updateMany({ where: { id, status: expected }, data });
-    if (count !== 1) throw new BadRequestException('A compra mudou de status. Atualize a página e tente novamente.');
+  async transition(
+    tx: Prisma.TransactionClient,
+    id: number,
+    expected: CompraStatus,
+    data: Prisma.CompraUpdateManyMutationInput,
+  ) {
+    const { count } = await tx.compra.updateMany({
+      where: { id, status: expected },
+      data,
+    });
+    if (count !== 1)
+      throw new BadRequestException(
+        'A compra mudou de status. Atualize a página e tente novamente.',
+      );
   }
 
   cancelarCompra(id: number, expected: CompraStatus) {
-    return this.prisma.$transaction(async (tx) => {
-      await this.transition(tx, id, expected, { status: 'CANCELADA', dataPagamento: null });
+    return this.prisma.withAudit(async (tx) => {
+      await this.transition(tx, id, expected, {
+        status: 'CANCELADA',
+        dataPagamento: null,
+      });
 
       await tx.despesa.updateMany({
         where: {
@@ -84,12 +97,23 @@ export class ComprasRepository {
     usuarioId: number,
     fornecedorNome: string,
   ) {
-    const valorTotal = input.itens.reduce(
-      (sum, item) => sum + item.quantidade * item.valorUnitario,
-      0,
+    const valorTotal = sumMoney(
+      input.itens.map((item) => itemTotal(item.quantidade, item.valorUnitario)),
     );
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.withAudit(async (tx) => {
+      const supplier = await tx.fornecedor.findFirst({
+        where: { id: input.fornecedorId, ativo: true },
+      });
+      if (!supplier)
+        throw new BadRequestException('Fornecedor inválido ou inativo.');
+      for (const item of input.itens) {
+        const product = await tx.produto.findFirst({
+          where: { id: item.produtoId, ativo: true },
+        });
+        if (!product)
+          throw new BadRequestException('Produto inválido ou inativo.');
+      }
       const compra = await tx.compra.create({
         data: {
           fornecedorId: input.fornecedorId,
@@ -102,7 +126,7 @@ export class ComprasRepository {
               produtoId: item.produtoId,
               quantidade: item.quantidade,
               valorUnitario: item.valorUnitario,
-              valorTotal: item.quantidade * item.valorUnitario,
+              valorTotal: itemTotal(item.quantidade, item.valorUnitario),
             })),
           },
         },

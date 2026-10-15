@@ -5,41 +5,54 @@ import type { Prisma } from '../../../generated/prisma/client';
 @Injectable()
 export class RefreshTokenRepository {
   constructor(private readonly prisma: PrismaService) {}
-
-  withUserLock<T>(usuarioId: number, run: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-    return this.prisma.$transaction(async (tx) => {
-      // Serializa emissão, rotação e revogação para que reuso não deixe um sucessor ativo.
+  withUserLock<T>(
+    usuarioId: number,
+    run: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.withAudit(async (tx) => {
       await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${usuarioId} FOR UPDATE`;
       return run(tx);
     });
   }
-
-  createEmpty(usuarioId: number, expiresAt: Date, tx: Prisma.TransactionClient) {
+  findByHash(tokenHash: string, tx?: Prisma.TransactionClient) {
+    return (tx ?? this.prisma).refreshToken.findFirst({
+      where: { tokenHash },
+      include: { sessao: true },
+    });
+  }
+  create(
+    usuarioId: number,
+    sessaoId: string,
+    tokenHash: string,
+    expiresAt: Date,
+    tx: Prisma.TransactionClient,
+  ) {
     return tx.refreshToken.create({
-      data: { usuarioId, tokenHash: '', expiresAt },
+      data: { usuarioId, sessaoId, tokenHash, expiresAt },
     });
   }
-
-  setHash(id: number, tokenHash: string, tx: Prisma.TransactionClient) {
-    return tx.refreshToken.update({
-      where: { id },
-      data: { tokenHash },
-    });
-  }
-
-  findById(id: number, tx: Prisma.TransactionClient) {
-    return tx.refreshToken.findUnique({ where: { id } });
-  }
-
   revoke(id: number, tx: Prisma.TransactionClient) {
     return tx.refreshToken.update({
       where: { id },
       data: { revokedAt: new Date() },
     });
   }
-
-  revokeAllForUser(usuarioId: number, tx: Prisma.TransactionClient) {
-    return tx.refreshToken.updateMany({
+  async revokeSession(sessaoId: string, tx: Prisma.TransactionClient) {
+    await tx.sessao.updateMany({
+      where: { id: sessaoId, revogadoEm: null },
+      data: { revogadoEm: new Date() },
+    });
+    await tx.refreshToken.updateMany({
+      where: { sessaoId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+  async revokeAllForUser(usuarioId: number, tx: Prisma.TransactionClient) {
+    await tx.sessao.updateMany({
+      where: { usuarioId, revogadoEm: null },
+      data: { revogadoEm: new Date() },
+    });
+    await tx.refreshToken.updateMany({
       where: { usuarioId, revokedAt: null },
       data: { revokedAt: new Date() },
     });

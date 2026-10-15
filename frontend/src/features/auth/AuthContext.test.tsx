@@ -9,20 +9,46 @@ import { reautenticacaoStore } from '../../lib/reautenticacao';
 import { SESSION_EXPIRED_EVENT } from '../../lib/api';
 import { loginRequest, logoutRequest, restoreSession } from './auth.api';
 
-vi.mock('./auth.api', () => ({ loginRequest: vi.fn(), logoutRequest: vi.fn(), restoreSession: vi.fn() }));
-const user = { id: 1, nome: 'Sintético', email: 'user@example.test', cargo: 'OPERADOR' as const, acessoFinanceiro: false };
+vi.mock('./auth.api', () => ({
+  loginRequest: vi.fn(),
+  logoutRequest: vi.fn(),
+  restoreSession: vi.fn(),
+}));
+const user = {
+  id: 1,
+  nome: 'Sintético',
+  email: 'user@example.test',
+  cargo: 'OPERADOR' as const,
+  acessoFinanceiro: false,
+};
 
 function Consumer() {
   const auth = useAuth();
-  return <>
-    <span>{auth.status}</span>
-    <button onClick={() => void auth.login('user@example.test', 'synthetic-password')}>Login</button>
-    <button onClick={() => void auth.logout()}>Logout</button>
-  </>;
+  return (
+    <>
+      <span>{auth.status}</span>
+      <button
+        onClick={() =>
+          void auth.login('user@example.test', 'synthetic-password')
+        }
+      >
+        Login
+      </button>
+      <button onClick={() => void auth.logout()}>Logout</button>
+    </>
+  );
 }
 function mount() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={client}><AuthProvider><Consumer /></AuthProvider></QueryClientProvider>);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <AuthProvider>
+        <Consumer />
+      </AuthProvider>
+    </QueryClientProvider>,
+  );
   return client;
 }
 
@@ -30,7 +56,10 @@ beforeEach(() => {
   vi.resetAllMocks();
   tokenStore.clear();
   reautenticacaoStore.clear();
-  vi.mocked(loginRequest).mockResolvedValue({ accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', user });
+  vi.mocked(loginRequest).mockResolvedValue({
+    accessToken: 'synthetic-access',
+    user,
+  });
   vi.mocked(restoreSession).mockResolvedValue(user);
   vi.mocked(logoutRequest).mockResolvedValue();
 });
@@ -43,13 +72,18 @@ describe('isolamento de sessão', () => {
     client.setQueryData(['private'], { balance: 123 });
     reautenticacaoStore.set('synthetic-reauth-token', 600);
     let finish!: () => void;
-    vi.mocked(logoutRequest).mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+    vi.mocked(logoutRequest).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Logout' }));
     expect(screen.getByText('unauthenticated')).toBeInTheDocument();
     expect(client.getQueryData(['private'])).toBeUndefined();
     expect(reautenticacaoStore.get()).toBeNull();
-    expect(tokenStore.getRefresh()).toBeNull();
-    expect(logoutRequest).toHaveBeenCalledWith('synthetic-refresh');
+    expect(localStorage.getItem('g5.refreshToken')).toBeNull();
+    expect(logoutRequest).toHaveBeenCalledWith();
     await act(async () => finish());
   });
 
@@ -70,7 +104,9 @@ describe('isolamento de sessão', () => {
     client.setQueryData(['private'], { owner: 'old-account' });
     reautenticacaoStore.set('synthetic-reauth-token', 600);
     await userEvent.click(screen.getByRole('button', { name: 'Login' }));
-    await waitFor(() => expect(screen.getByText('authenticated')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('authenticated')).toBeInTheDocument(),
+    );
     expect(client.getQueryData(['private'])).toBeUndefined();
     expect(reautenticacaoStore.get()).toBeNull();
   });

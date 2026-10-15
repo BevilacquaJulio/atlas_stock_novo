@@ -28,14 +28,14 @@ jobs:
       MYSQL_PORT: 13316
       MYSQL_USER: atlas_audit
       MYSQL_PASSWORD: synthetic-ci-database-only
-      MYSQL_DATABASE: atlas_audit_test
+      MYSQL_DATABASE: atlas_estoque_teste
       MYSQL_SSL: false
       ALLOW_TEST_DATABASE: true
     services:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_DATABASE: atlas_audit_test
+          MYSQL_DATABASE: atlas_estoque_teste
           MYSQL_USER: atlas_audit
           MYSQL_PASSWORD: synthetic-ci-database-only
           MYSQL_ROOT_PASSWORD: synthetic-ci-root-only
@@ -55,10 +55,27 @@ jobs:
       - run: npm run prisma:generate
       - run: npm run lint:ci
       - run: npm run typecheck:ci
-      - run: npm run test:cov
       - run: npm run build
       - run: npm run prisma:deploy
-      - run: npm run test:integration
+      - name: Verify upgrade with existing data
+        env:
+          MYSQL_USER: root
+          MYSQL_PASSWORD: synthetic-ci-root-only
+          MYSQL_DATABASE: atlas_upgrade_test
+          ALLOW_CREATE_TEST_DATABASE: true
+        run: npm run test:upgrade
+      - name: Restore synthetic backup and compare
+        env:
+          MYSQL_SERVICE: ${{ job.services.mysql.id }}
+          MYSQL_USER: root
+          MYSQL_PASSWORD: synthetic-ci-root-only
+          MYSQL_DATABASE: atlas_upgrade_test
+        run: |
+          docker exec "$MYSQL_SERVICE" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -uroot --single-transaction --no-tablespaces --set-gtid-purged=OFF atlas_upgrade_test > /tmp/atlas-upgrade.sql'
+          docker exec "$MYSQL_SERVICE" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -e "CREATE DATABASE atlas_restore_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"'
+          docker exec "$MYSQL_SERVICE" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot atlas_restore_test < /tmp/atlas-upgrade.sql'
+          node scripts/verify-restore.cjs
+      - run: npm run test:cov
       - run: test -s coverage/lcov.info
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -109,6 +126,27 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  security:
+    name: Secrets and release images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Scan tracked history and working files
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" -w /repo zricethezav/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git --redact --no-banner .
+          docker run --rm -v "$PWD:/repo:ro" -w /repo zricethezav/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f dir --redact --no-banner .
+      - name: Build release images without publishing
+        run: |
+          docker build -t atlas-ci-api backend
+          docker build -t atlas-ci-app frontend
+      - name: Scan release images
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock:ro aquasec/trivy@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 image --exit-code 1 --severity HIGH,CRITICAL --scanners vuln atlas-ci-api
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock:ro aquasec/trivy@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 image --exit-code 1 --severity HIGH,CRITICAL --scanners vuln atlas-ci-app
+
   audit:
     name: Production dependency audit
     runs-on: ubuntu-24.04
@@ -141,16 +179,15 @@ jobs:
       MYSQL_PORT: 13316
       MYSQL_USER: atlas_audit
       MYSQL_PASSWORD: synthetic-ci-database-only
-      MYSQL_DATABASE: atlas_audit_test
+      MYSQL_DATABASE: atlas_estoque_teste
       MYSQL_SSL: false
       ALLOW_TEST_DATABASE: true
       JWT_ACCESS_SECRET: synthetic-e2e-access-secret-atlas-only
-      JWT_REFRESH_SECRET: synthetic-e2e-refresh-secret-atlas-only
     services:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_DATABASE: atlas_audit_test
+          MYSQL_DATABASE: atlas_estoque_teste
           MYSQL_USER: atlas_audit
           MYSQL_PASSWORD: synthetic-ci-database-only
           MYSQL_ROOT_PASSWORD: synthetic-ci-root-only
@@ -278,7 +315,7 @@ jobs:
   required:
     name: CI Required
     if: ${{ always() }}
-    needs: [backend, frontend, audit, e2e, sonar]
+    needs: [backend, frontend, audit, e2e, sonar, security]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -289,8 +326,9 @@ jobs:
           AUDIT: ${{ needs.audit.result }}
           E2E: ${{ needs.e2e.result }}
           SONAR: ${{ needs.sonar.result }}
+          SECURITY: ${{ needs.security.result }}
         run: |
-          for result in "$BACKEND" "$FRONTEND" "$AUDIT" "$E2E" "$SONAR"; do
+          for result in "$BACKEND" "$FRONTEND" "$AUDIT" "$E2E" "$SONAR" "$SECURITY"; do
             if [ "$result" != success ]; then
               echo '::error::A mandatory validation failed, was cancelled or did not run.'
               exit 1

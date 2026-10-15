@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UsuariosService } from './usuarios.service';
 import {
@@ -17,8 +26,8 @@ export class UsuariosController {
   constructor(private readonly service: UsuariosService) {}
 
   @Get()
-  list() {
-    return this.service.list();
+  list(@Query() query?: PaginationQueryDto) {
+    return this.service.list(query);
   }
 
   @Post()

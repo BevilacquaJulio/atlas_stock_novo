@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { getApiErrorMessage } from '../../lib/api';
+import { api } from '../../lib/api';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { PageHeader } from '../../components/PageHeader';
 import { TableContainer } from '../../components/ListToolbar';
 import { Button } from '../../components/Button';
@@ -25,18 +27,23 @@ import {
 
 function acessoFinanceiroLabel(u: Usuario): string {
   if (u.cargo === 'ADMINISTRADOR') return 'Sempre';
-  if (u.cargo === 'GERENTE') return u.acessoFinanceiro ? 'Liberado' : 'Sem acesso';
+  if (u.cargo === 'GERENTE')
+    return u.acessoFinanceiro ? 'Liberado' : 'Sem acesso';
   return 'Sem acesso';
 }
 
 export default function UsuariosPage() {
   const { administrador } = usePermissoes();
-  const query = useUsuarios(administrador);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
+  const query = useUsuarios(administrador, debouncedSearch);
   const createMut = useCreateUsuario();
   const updateMut = useUpdateAcessoUsuario();
   const [criando, setCriando] = useState(false);
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [recoveryLink, setRecoveryLink] = useState('');
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
 
   if (!administrador) {
     return (
@@ -94,6 +101,44 @@ export default function UsuariosPage() {
           </Button>
         }
       />
+      {formError && !criando && !editando && (
+        <Alert kind="error">{formError}</Alert>
+      )}
+      <input
+        aria-label="Buscar usuários"
+        type="search"
+        maxLength={200}
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Buscar por nome ou e-mail"
+        className="mb-4 rounded border px-3 py-2"
+      />
+      {query.hasNextPage && (
+        <Button
+          variant="secondary"
+          loading={query.isFetchingNextPage}
+          onClick={() => void query.fetchNextPage()}
+        >
+          Carregar mais usuários
+        </Button>
+      )}
+      {recoveryLink && (
+        <Alert kind="success">
+          <p>
+            Link de uso único, válido por 15 minutos. Entregue somente ao
+            titular da conta.
+          </p>
+          <input
+            aria-label="Link de recuperação"
+            readOnly
+            value={recoveryLink}
+            className="w-full border p-2"
+          />
+          <button type="button" onClick={() => setRecoveryLink('')}>
+            Ocultar link
+          </button>
+        </Alert>
+      )}
 
       {query.isLoading ? (
         <Spinner />
@@ -125,6 +170,32 @@ export default function UsuariosPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end">
+                    {u.ativo && (
+                      <Button
+                        variant="secondary"
+                        disabled={recoveryBusy}
+                        onClick={() => {
+                          setRecoveryBusy(true);
+                          setRecoveryLink('');
+                          setFormError(null);
+                          void api
+                            .post<{ token: string }>(
+                              `/auth/recuperacao/${u.id}`,
+                            )
+                            .then(({ data }) =>
+                              setRecoveryLink(
+                                `${window.location.origin}/recuperar#${data.token}`,
+                              ),
+                            )
+                            .catch((err: unknown) =>
+                              setFormError(getApiErrorMessage(err)),
+                            )
+                            .finally(() => setRecoveryBusy(false));
+                        }}
+                      >
+                        Gerar recuperação
+                      </Button>
+                    )}
                     <IconButton
                       label={`Editar acesso de ${u.nome}`}
                       onClick={() => abrirEdicao(u)}

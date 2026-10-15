@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import path from 'node:path';
 import { defineConfig } from 'prisma/config';
 import { buildDatabaseUrl } from './src/config/database-url';
@@ -8,8 +9,8 @@ import { buildDatabaseUrl } from './src/config/database-url';
  * O datasource NÃO tem `url` no schema.prisma — a conexão vive aqui. Em
  * runtime o PrismaService usa o driver adapter mariadb (obrigatório no
  * Prisma 7); a CLI (migrate/introspect) usa a `url` abaixo. A URL é montada
- * a partir das variáveis MYSQL_* (com senha url-encoded). A CLI do Prisma
- * carrega o .env automaticamente antes de avaliar este arquivo.
+ * a partir das variáveis MYSQL_* (com senha url-encoded). O import de dotenv
+ * carrega explicitamente o .env antes de avaliar a configuração.
  */
 export default defineConfig({
   schema: path.join('prisma', 'schema.prisma'),

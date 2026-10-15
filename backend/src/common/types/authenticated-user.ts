@@ -2,26 +2,12 @@ import type { Cargo } from '../../../generated/prisma/client';
 
 /** Payload do access token / usuário anexado à request após o JwtAuthGuard. */
 export interface AuthenticatedUser {
+  sessaoId?: string;
+  mfaAtivo?: boolean;
   id: number;
   nome: string;
   email: string;
   cargo: Cargo;
   /** Permissão financeira efetiva, calculada no servidor (temAcessoFinanceiro). */
   acessoFinanceiro: boolean;
-}
-
-/** Claims do JWT (access token). */
-export interface JwtAccessPayload {
-  purpose: 'access';
-  sub: number;
-  email: string;
-  cargo: Cargo;
-  nome: string;
-}
-
-/** Claims do JWT (refresh token). */
-export interface JwtRefreshPayload {
-  purpose: 'refresh';
-  sub: number;
-  tokenId: number;
 }

@@ -37,7 +37,7 @@ interface NavItem {
 
 const principalNav: NavItem[] = [
   { to: '/', label: 'Dashboard', Icon: IconDashboard },
-  
+  { to: '/seguranca', label: 'Segurança da conta', Icon: IconShield },
 ];
 
 const operacoesNav: NavItem[] = [
@@ -92,7 +92,10 @@ export function AppLayout() {
           >
             <IconMenu />
           </button>
-          <BrandLogo variant="on-dark" className="h-10 w-auto max-w-[240px] sm:h-15" />
+          <BrandLogo
+            variant="on-dark"
+            className="h-10 w-auto max-w-[240px] sm:h-15"
+          />
         </div>
         <div className="flex items-center">
           <NotificationBell />
@@ -216,7 +219,8 @@ function NavGroup({
         {title}
       </p>
       {visiveis.map(({ to, label, Icon }) => {
-        const isActive = to === '/' ? activePath === '/' : activePath.startsWith(to);
+        const isActive =
+          to === '/' ? activePath === '/' : activePath.startsWith(to);
         return (
           <NavLink
             key={to}

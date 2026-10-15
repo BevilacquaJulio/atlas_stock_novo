@@ -98,7 +98,9 @@ export class ProjetosService {
     const projeto = await this.findOne(id);
 
     if (projeto.status === 'CANCELADO') {
-      throw new BadRequestException('Projeto cancelado não pode mudar de status.');
+      throw new BadRequestException(
+        'Projeto cancelado não pode mudar de status.',
+      );
     }
     if (projeto.status === 'CONCLUIDO' && input.status !== 'CONCLUIDO') {
       throw new BadRequestException(
@@ -160,7 +162,7 @@ export class ProjetosService {
       throw new NotFoundException('Item de checklist não encontrado.');
     }
 
-    return this.repo.updateChecklistItem(itemId, input);
+    return this.repo.updateChecklistItem(itemId, input, projetoId);
   }
 
   async removeChecklistItem(projetoId: number, itemId: number) {
@@ -176,7 +178,7 @@ export class ProjetosService {
       throw new NotFoundException('Item de checklist não encontrado.');
     }
 
-    await this.repo.deleteChecklistItem(itemId);
+    await this.repo.deleteChecklistItem(itemId, projetoId);
   }
 
   async registrarConsumo(
@@ -186,7 +188,11 @@ export class ProjetosService {
   ) {
     const projeto = await this.findOne(projetoId);
 
-    if (!projeto.ativo || projeto.status === 'CANCELADO' || projeto.status === 'CONCLUIDO') {
+    if (
+      !projeto.ativo ||
+      projeto.status === 'CANCELADO' ||
+      projeto.status === 'CONCLUIDO'
+    ) {
       throw new BadRequestException(
         'Não é possível registrar consumo em projeto inativo ou encerrado.',
       );
@@ -201,24 +207,28 @@ export class ProjetosService {
         throw new BadRequestException('O produto pertence a outro projeto.');
       }
 
-      return this.prisma.$transaction(async (tx) => {
+      return this.prisma.withAudit(async (tx) => {
         await this.repo.lockOpenProject(projetoId, tx);
         try {
           await this.movimentacoesRepo.registrar(
-          {
-            produtoId: input.produtoId!,
-            tipo: 'SAIDA',
-            quantidade: input.quantidade,
-            custoUnitario: Number(produto.custoMedio),
-            motivo: `Consumo projeto #${projetoId}`,
-            usuarioId,
-            projetoId,
-          },
-          tx,
+            {
+              produtoId: input.produtoId!,
+              tipo: 'SAIDA',
+              quantidade: input.quantidade,
+              motivo: `Consumo projeto #${projetoId}`,
+              usuarioId,
+              projetoId,
+            },
+            tx,
           );
         } catch (error) {
-          if (error instanceof Error && error.message === 'ESTOQUE_INSUFICIENTE') {
-            throw new BadRequestException('Estoque insuficiente para este consumo.');
+          if (
+            error instanceof Error &&
+            error.message === 'ESTOQUE_INSUFICIENTE'
+          ) {
+            throw new BadRequestException(
+              'Estoque insuficiente para este consumo.',
+            );
           }
           throw error;
         }
@@ -227,7 +237,7 @@ export class ProjetosService {
       });
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.withAudit(async (tx) => {
       await this.repo.lockOpenProject(projetoId, tx);
       return this.repo.createConsumo(projetoId, input, usuarioId, tx);
     });

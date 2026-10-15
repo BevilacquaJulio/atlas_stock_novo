@@ -42,6 +42,7 @@ class Rotas {
 
 const usuario = (over: Partial<AuthenticatedUser> = {}): AuthenticatedUser => ({
   id: 7,
+  sessaoId: '11111111-1111-4111-8111-111111111111',
   nome: 'Sintético',
   email: 's@example.test',
   cargo: 'GERENTE',
@@ -63,13 +64,16 @@ function contexto(
 }
 
 const tokenDe = (payload: object, secret = SECRET) =>
-  jwt.signAsync(payload, {
-    issuer: jwtPolicy.issuer,
-    audience: jwtPolicy.audience,
-    algorithm: 'HS256',
-    secret,
-    expiresIn: 600,
-  });
+  jwt.signAsync(
+    { sid: '11111111-1111-4111-8111-111111111111', ...payload },
+    {
+      issuer: jwtPolicy.issuer,
+      audience: jwtPolicy.audience,
+      algorithm: 'HS256',
+      secret,
+      expiresIn: 600,
+    },
+  );
 
 async function codigo(promise: Promise<unknown>) {
   try {

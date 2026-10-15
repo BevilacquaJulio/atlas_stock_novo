@@ -1,4 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   createUsuario,
   listUsuarios,
@@ -8,8 +12,17 @@ import type { AcessoUsuarioValues, NovoUsuarioValues } from './usuarios.types';
 
 const KEY = ['usuarios'];
 
-export function useUsuarios(enabled: boolean) {
-  return useQuery({ queryKey: KEY, queryFn: listUsuarios, enabled });
+export function useUsuarios(enabled: boolean, search = '') {
+  return useInfiniteQuery({
+    queryKey: [...KEY, search],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
+      listUsuarios({ page: pageParam, limit: 25, search: search || undefined }),
+    getNextPageParam: (last, pages) =>
+      last.length === 25 ? pages.length + 1 : undefined,
+    select: (data) => data.pages.flat(),
+    enabled,
+  });
 }
 
 export function useCreateUsuario() {

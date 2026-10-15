@@ -6,7 +6,6 @@ const valid = {
   MYSQL_USER: 'synthetic',
   MYSQL_DATABASE: 'synthetic',
   JWT_ACCESS_SECRET: 'synthetic-access-secret-for-testing-only',
-  JWT_REFRESH_SECRET: 'synthetic-refresh-secret-for-testing-only',
 };
 
 describe('configuração de JWT', () => {
@@ -30,15 +29,9 @@ describe('configuração de JWT', () => {
     }
     expect(envSchema.safeParse({ ...valid, PORT: 65536 }).success).toBe(false);
   });
-  it('recusa segredo curto, igual e placeholder em produção', () => {
+  it('recusa segredo curto e placeholder em produção', () => {
     expect(
       envSchema.safeParse({ ...valid, JWT_ACCESS_SECRET: 'short' }).success,
-    ).toBe(false);
-    expect(
-      envSchema.safeParse({
-        ...valid,
-        JWT_REFRESH_SECRET: valid.JWT_ACCESS_SECRET,
-      }).success,
     ).toBe(false);
     expect(
       envSchema.safeParse({
@@ -48,6 +41,39 @@ describe('configuração de JWT', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('limita confiança de proxy a IPs/CIDRs e cookie inseguro ao domínio local', () => {
+    for (const TRUST_PROXY of [
+      'true',
+      '1',
+      '*',
+      '10.0.0.1/99',
+      'proxy.example',
+    ])
+      expect(envSchema.safeParse({ ...valid, TRUST_PROXY }).success).toBe(
+        false,
+      );
+    expect(
+      envSchema.safeParse({ ...valid, TRUST_PROXY: '127.0.0.1/32,::1/128' })
+        .success,
+    ).toBe(true);
+    expect(
+      envSchema.safeParse({
+        ...valid,
+        NODE_ENV: 'production',
+        COOKIE_SECURE: 'false',
+        CORS_ORIGIN: 'https://atlas.example',
+      }).success,
+    ).toBe(false);
+    expect(
+      envSchema.safeParse({
+        ...valid,
+        NODE_ENV: 'production',
+        COOKIE_SECURE: 'false',
+        CORS_ORIGIN: 'http://atlas.localhost',
+      }).success,
+    ).toBe(true);
+  });
   it('recusa duração inválida, zero e access longo', () => {
     for (const JWT_ACCESS_EXPIRES_IN of ['abc', '0m', '24h', '900']) {
       expect(
@@ -55,7 +81,8 @@ describe('configuração de JWT', () => {
       ).toBe(false);
     }
     expect(
-      envSchema.safeParse({ ...valid, JWT_REFRESH_EXPIRES_IN: '365d' }).success,
+      envSchema.safeParse({ ...valid, REFRESH_TOKEN_TTL_SECONDS: 31536000 })
+        .success,
     ).toBe(false);
     expect(envSchema.safeParse(valid).success).toBe(true);
   });

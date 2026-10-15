@@ -5,8 +5,33 @@ services:
     build: ./backend
     container_name: bl_g5-api
     restart: unless-stopped
-    env_file:
-      - .env
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 30s
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      MYSQL_HOST: ${MYSQL_HOST:-mysql_shared}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Configure MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER:?Configure MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Configure MYSQL_PASSWORD}
+      MYSQL_SSL: ${MYSQL_SSL:-true}
+      MYSQL_SSL_REJECT_UNAUTHORIZED: ${MYSQL_SSL_REJECT_UNAUTHORIZED:-true}
+      MYSQL_SSL_CA_PATH: ${MYSQL_SSL_CA_PATH:-/run/secrets/mysql-ca.pem}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Configure JWT_ACCESS_SECRET}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-604800}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      REQUIRE_PRIVILEGED_MFA: ${REQUIRE_PRIVILEGED_MFA:-false}
+      COOKIE_SECURE: "true"
+      CORS_ORIGIN: https://${DOMAIN}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      THROTTLE_TTL: ${THROTTLE_TTL:-60}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
     volumes:
       - ./secrets/mysql-ca.pem:/run/secrets/mysql-ca.pem:ro
     networks:
@@ -38,6 +63,12 @@ services:
         VITE_API_URL: https://api.${DOMAIN}/api
     container_name: bl_g5-app
     restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 30s
     depends_on:
       api:
         condition: service_healthy
@@ -55,7 +86,7 @@ services:
       - traefik.http.routers.g5_web.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
       - traefik.http.routers.g5_web.tls=true
       - traefik.http.routers.g5_web.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
-      - traefik.http.services.g5_web.loadbalancer.server.port=80
+      - traefik.http.services.g5_web.loadbalancer.server.port=8080
     mem_limit: 128m
     cpus: 0.25
 
@@ -69,10 +100,19 @@ services:
     build:
       context: ./backend
       target: build
+    environment:
+      MYSQL_USER: ${MYSQL_MIGRATE_USER:?Configure MYSQL_MIGRATE_USER}
+      MYSQL_PASSWORD: ${MYSQL_MIGRATE_PASSWORD:?Configure MYSQL_MIGRATE_PASSWORD}
+      MYSQL_HOST: ${MYSQL_HOST:-mysql_shared}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Configure MYSQL_DATABASE}
+      MYSQL_SSL: ${MYSQL_SSL:-true}
+      MYSQL_SSL_REJECT_UNAUTHORIZED: ${MYSQL_SSL_REJECT_UNAUTHORIZED:-true}
+      MYSQL_SSL_CA_PATH: ${MYSQL_SSL_CA_PATH:-/run/secrets/mysql-ca.pem}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
     profiles:
       - tools
-    env_file:
-      - .env
     volumes:
       - ./secrets/mysql-ca.pem:/run/secrets/mysql-ca.pem:ro
     networks:

@@ -23,6 +23,7 @@ describe('UsuariosService.atualizarAcesso', () => {
     travarAdministradoresAtivos: ReturnType<typeof vi.fn>;
     findById: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
+    revogarSessoes: ReturnType<typeof vi.fn>;
   };
   let service: UsuariosService;
 
@@ -37,6 +38,7 @@ describe('UsuariosService.atualizarAcesso', () => {
       travarAdministradoresAtivos: vi.fn(),
       findById: vi.fn(),
       update: vi.fn((id: number, data: object) => ({ id, ...data })),
+      revogarSessoes: vi.fn(),
     };
     service = new UsuariosService(repo as unknown as UsuariosRepository);
   });

@@ -53,23 +53,29 @@ export class FinanceiroRepository {
   }
 
   createDespesa(input: CreateDespesaInput) {
-    return this.prisma.despesa.create({
-      data: {
-        descricao: input.descricao,
-        valor: input.valor,
-        dataVencimento: input.dataVencimento ?? null,
-        fornecedorId: input.fornecedorId ?? null,
-        categoriaDespesaId: input.categoriaDespesaId ?? null,
-        projetoId: input.projetoId ?? null,
-      },
-      include: despesaInclude,
-    });
+    return this.prisma.withAudit((tx) =>
+      tx.despesa.create({
+        data: {
+          descricao: input.descricao,
+          valor: input.valor,
+          dataVencimento: input.dataVencimento ?? null,
+          fornecedorId: input.fornecedorId ?? null,
+          categoriaDespesaId: input.categoriaDespesaId ?? null,
+          projetoId: input.projetoId ?? null,
+        },
+        include: despesaInclude,
+      }),
+    );
   }
 
   updateDespesa(id: number, input: UpdateDespesaInput) {
     return this.changeExpense(id, {
-        descricao: input.descricao, valor: input.valor, dataVencimento: input.dataVencimento,
-        fornecedorId: input.fornecedorId, categoriaDespesaId: input.categoriaDespesaId, projetoId: input.projetoId,
+      descricao: input.descricao,
+      valor: input.valor,
+      dataVencimento: input.dataVencimento,
+      fornecedorId: input.fornecedorId,
+      categoriaDespesaId: input.categoriaDespesaId,
+      projetoId: input.projetoId,
     });
   }
 
@@ -103,22 +109,27 @@ export class FinanceiroRepository {
   }
 
   createReceita(input: CreateReceitaInput) {
-    return this.prisma.receita.create({
-      data: {
-        descricao: input.descricao,
-        valor: input.valor,
-        dataVencimento: input.dataVencimento ?? null,
-        clienteId: input.clienteId ?? null,
-        projetoId: input.projetoId ?? null,
-      },
-      include: receitaInclude,
-    });
+    return this.prisma.withAudit((tx) =>
+      tx.receita.create({
+        data: {
+          descricao: input.descricao,
+          valor: input.valor,
+          dataVencimento: input.dataVencimento ?? null,
+          clienteId: input.clienteId ?? null,
+          projetoId: input.projetoId ?? null,
+        },
+        include: receitaInclude,
+      }),
+    );
   }
 
   updateReceita(id: number, input: UpdateReceitaInput) {
     return this.changeRevenue(id, {
-        descricao: input.descricao, valor: input.valor, dataVencimento: input.dataVencimento,
-        clienteId: input.clienteId, projetoId: input.projetoId,
+      descricao: input.descricao,
+      valor: input.valor,
+      dataVencimento: input.dataVencimento,
+      clienteId: input.clienteId,
+      projetoId: input.projetoId,
     });
   }
 
@@ -126,19 +137,43 @@ export class FinanceiroRepository {
     return this.changeRevenue(id, { status: 'RECEBIDO', dataRecebimento });
   }
 
-  private changeExpense(id: number, data: Prisma.DespesaUncheckedUpdateManyInput) {
-    return this.prisma.$transaction(async (tx) => {
-      const changed = await tx.despesa.updateMany({ where: { id, status: 'A_PAGAR', compraId: null }, data });
-      if (changed.count !== 1) throw new BadRequestException('Despesa indisponível para esta alteração. Atualize a página.');
-      return tx.despesa.findUniqueOrThrow({ where: { id }, include: despesaInclude });
+  private changeExpense(
+    id: number,
+    data: Prisma.DespesaUncheckedUpdateManyInput,
+  ) {
+    return this.prisma.withAudit(async (tx) => {
+      const changed = await tx.despesa.updateMany({
+        where: { id, status: 'A_PAGAR', compraId: null },
+        data,
+      });
+      if (changed.count !== 1)
+        throw new BadRequestException(
+          'Despesa indisponível para esta alteração. Atualize a página.',
+        );
+      return tx.despesa.findUniqueOrThrow({
+        where: { id },
+        include: despesaInclude,
+      });
     });
   }
 
-  private changeRevenue(id: number, data: Prisma.ReceitaUncheckedUpdateManyInput) {
-    return this.prisma.$transaction(async (tx) => {
-      const changed = await tx.receita.updateMany({ where: { id, status: 'A_RECEBER' }, data });
-      if (changed.count !== 1) throw new BadRequestException('Receita indisponível para esta alteração. Atualize a página.');
-      return tx.receita.findUniqueOrThrow({ where: { id }, include: receitaInclude });
+  private changeRevenue(
+    id: number,
+    data: Prisma.ReceitaUncheckedUpdateManyInput,
+  ) {
+    return this.prisma.withAudit(async (tx) => {
+      const changed = await tx.receita.updateMany({
+        where: { id, status: 'A_RECEBER' },
+        data,
+      });
+      if (changed.count !== 1)
+        throw new BadRequestException(
+          'Receita indisponível para esta alteração. Atualize a página.',
+        );
+      return tx.receita.findUniqueOrThrow({
+        where: { id },
+        include: receitaInclude,
+      });
     });
   }
 

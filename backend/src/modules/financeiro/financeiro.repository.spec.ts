@@ -13,7 +13,7 @@ function fixture(count = 1) {
     findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 2 }),
   };
   const tx = { despesa, receita };
-  const prisma = { $transaction: vi.fn((run) => run(tx)) };
+  const prisma = { withAudit: vi.fn((run) => run(tx)) };
   return {
     repo: new FinanceiroRepository(prisma as unknown as PrismaService),
     ...tx,

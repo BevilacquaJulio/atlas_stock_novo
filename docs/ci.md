@@ -8,15 +8,16 @@ atualização automática de dependências, criação de PR ou merge automático
 
 ## Critérios e comandos
 
-| Check | Comandos e condição |
-| --- | --- |
-| Backend validation | `npm ci`, `npm run prisma:generate`, `npm run lint:ci`, `npm run typecheck:ci`, `npm run test:cov`, `npm run build`, `npm run prisma:deploy`, `npm run test:integration` em backend |
-| Frontend validation | `npm ci`, `npm run lint:ci`, `npm run typecheck:ci`, `npm run test:cov`, `npm run build` em frontend |
-| Production dependency audit (backend/frontend) | `npm ci --ignore-scripts` e `npm audit --omit=dev --audit-level=high` no respectivo lockfile; falha de consulta também bloqueia |
-| Critical flows E2E | Builds dos dois jobs anteriores, migrations em outro MySQL descartável, Chromium instalado; `npm run typecheck:e2e` e `npm run test:e2e` em frontend |
-| SonarCloud Quality Gate | LCOV dos dois jobs transferido por artefatos, histórico Git completo, política de código novo verificada e scan aguardando o gate, com timeout de 300 segundos |
-| CodeQL analysis | JavaScript/TypeScript, build mode `none`, queries `security-extended`, upload e processamento aguardados |
-| CI Required | Sempre avalia os cinco jobs obrigatórios; só aprova se todos terminarem com `success` |
+| Check                                          | Comandos e condição                                                                                                                                             |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend validation                             | `npm ci`, geração Prisma, lint, tipos, build, migrations em banco vazio, `test:upgrade`, restauração sintética e `test:cov` (unitários + integração) em backend |
+| Frontend validation                            | `npm ci`, `npm run lint:ci`, `npm run typecheck:ci`, `npm run test:cov`, `npm run build` em frontend                                                            |
+| Production dependency audit (backend/frontend) | `npm ci --ignore-scripts` e `npm audit --omit=dev --audit-level=high` no respectivo lockfile; falha de consulta também bloqueia                                 |
+| Secrets and release images                     | Gitleaks no histórico/arquivos, build Docker sem publicar e Trivy HIGH/CRITICAL nas duas imagens                                                                |
+| Critical flows E2E                             | Builds dos dois jobs anteriores, migrations em outro MySQL descartável, Chromium instalado; `npm run typecheck:e2e` e `npm run test:e2e` em frontend            |
+| SonarCloud Quality Gate                        | LCOV dos dois jobs transferido por artefatos, histórico Git completo, política de código novo verificada e scan aguardando o gate, com timeout de 300 segundos  |
+| CodeQL analysis                                | JavaScript/TypeScript, build mode `none`, queries `security-extended`, upload e processamento aguardados                                                        |
+| CI Required                                    | Sempre avalia os seis jobs obrigatórios; só aprova se todos terminarem com `success`                                                                            |
 
 `lint:ci` não corrige fontes automaticamente. `typecheck:ci` é separado do
 build e a API inclui tipos dos testes. O E2E checa tipos após receber os
@@ -78,7 +79,7 @@ outro banco antes de iniciar os servidores. Não há reset ou acesso à base
 de produção. HTML/trace de falha contém apenas dados do ambiente sintético.
 
 Ambiente exato para HTTP e E2E: MySQL 8.4 em `127.0.0.1:13316`, banco
-`atlas_audit_test`, usuário `atlas_audit`, `MYSQL_SSL=false`, `NODE_ENV=test`
+`atlas_estoque_teste`, usuário `atlas_audit`, `MYSQL_SSL=false`, `NODE_ENV=test`
 e `ALLOW_TEST_DATABASE=true`. O CI aplica as migrations versionadas e não
 usa `db push`. O segundo job possui seu próprio MySQL e reaplica migrations;
 nenhum banco ou `node_modules` é compartilhado entre runners.

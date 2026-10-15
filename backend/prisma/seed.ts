@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
-import * as bcrypt from 'bcryptjs';
+import { hashPassword } from '../src/common/auth/password';
 import { PrismaClient } from '../generated/prisma/client';
 import { buildDatabaseConfig } from '../src/config/database-url';
 import { newPasswordSchema } from '../src/common/validators/bounds';
@@ -27,7 +27,7 @@ const prisma = new PrismaClient({
 });
 
 async function main(): Promise<void> {
-  const senhaHash = await bcrypt.hash(adminSenha, 10);
+  const senhaHash = await hashPassword(adminSenha);
   await prisma.usuario.upsert({
     where: { email: adminEmail },
     update: {},

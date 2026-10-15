@@ -1,0 +1,11 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Dependências, artefatos gerados e relatórios privados não são código da aplicação."
+paths = ['''(^|/)(node_modules|dist|generated|coverage|tmp|\.git|test-results|playwright-report)(/|$)''']
+
+[[allowlists]]
+description = "Somente o placeholder público de JWT e o vetor de teste público do RFC 6238."
+regexTarget = "secret"
+regexes = ['''^troque-por-um-segredo-forte-de-32-chars$''', '''^GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ$''']

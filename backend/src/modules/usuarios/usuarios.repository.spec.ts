@@ -6,17 +6,25 @@ import type { Prisma } from '../../../generated/prisma/client';
 function setup() {
   const tx = {
     $queryRaw: vi.fn().mockResolvedValue([{ id: 1 }, { id: BigInt(5) }]),
-    usuario: { update: vi.fn().mockResolvedValue({ id: 2 }) },
+    usuario: {
+      update: vi.fn().mockResolvedValue({ id: 2 }),
+      create: vi.fn().mockResolvedValue({ id: 3 }),
+    },
   };
   const prisma = {
     usuario: {
       findUnique: vi.fn().mockResolvedValue({ id: 2 }),
       create: vi.fn().mockResolvedValue({ id: 3 }),
     },
-    $transaction: vi.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
+    withAudit: vi.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
   };
   const repo = new UsuariosRepository(prisma as unknown as PrismaService);
-  return { repo, prisma, tx: tx as unknown as Prisma.TransactionClient, rawTx: tx };
+  return {
+    repo,
+    prisma,
+    tx: tx as unknown as Prisma.TransactionClient,
+    rawTx: tx,
+  };
 }
 
 describe('UsuariosRepository — acessos', () => {
@@ -25,7 +33,6 @@ describe('UsuariosRepository — acessos', () => {
     await repo.findByIdWithSenha(2);
     expect(prisma.usuario.findUnique).toHaveBeenCalledWith({
       where: { id: 2 },
-      select: { id: true, ativo: true, senha: true },
     });
   });
 
@@ -35,7 +42,7 @@ describe('UsuariosRepository — acessos', () => {
   });
 
   it('cria com a permissão financeira e devolve a projeção pública', async () => {
-    const { repo, prisma } = setup();
+    const { repo, rawTx } = setup();
     const data = {
       nome: 'N',
       email: 'n@example.test',
@@ -44,7 +51,7 @@ describe('UsuariosRepository — acessos', () => {
       acessoFinanceiro: true,
     };
     await repo.create(data);
-    expect(prisma.usuario.create).toHaveBeenCalledWith({
+    expect(rawTx.usuario.create).toHaveBeenCalledWith({
       data,
       select: usuarioSelect,
     });
@@ -60,9 +67,13 @@ describe('UsuariosRepository — acessos', () => {
 
   it('atualiza dentro da transação recebida', async () => {
     const { repo, tx, rawTx, prisma } = setup();
-    const data = { cargo: 'OPERADOR' as const, ativo: false, acessoFinanceiro: false };
+    const data = {
+      cargo: 'OPERADOR' as const,
+      ativo: false,
+      acessoFinanceiro: false,
+    };
     await repo.runInTransaction((t) => repo.update(2, data, t));
-    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.withAudit).toHaveBeenCalled();
     expect(rawTx.usuario.update).toHaveBeenCalledWith({
       where: { id: 2 },
       data,

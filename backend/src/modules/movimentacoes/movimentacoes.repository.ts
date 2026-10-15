@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { MAX_MONEY, MAX_QUANTITY } from '../../common/validators/bounds';
+import { itemTotal } from '../../common/money';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { Prisma, Produto } from '../../../generated/prisma/client';
 
@@ -7,7 +8,7 @@ type RegistrarParams = {
   produtoId: number;
   tipo: 'ENTRADA' | 'SAIDA';
   quantidade: number;
-  custoUnitario: number;
+  custoUnitario?: number;
   motivo: string | null;
   usuarioId: number;
   compraId?: number;
@@ -78,7 +79,7 @@ export class MovimentacoesRepository {
       this.executarRegistro(client, params);
 
     if (tx) return run(tx);
-    return this.prisma.$transaction(run);
+    return this.prisma.withAudit(run);
   }
 
   private async executarRegistro(
@@ -89,7 +90,6 @@ export class MovimentacoesRepository {
       produtoId,
       tipo,
       quantidade,
-      custoUnitario,
       motivo,
       usuarioId,
       compraId,
@@ -99,9 +99,9 @@ export class MovimentacoesRepository {
 
     // Lock e leitura corrente evitam saldo obsoleto após esperar outra transação.
     const [produto] = await tx.$queryRaw<
-      Array<Pick<Produto, 'quantidadeEstoque' | 'custoMedio'>>
+      Array<Pick<Produto, 'quantidadeEstoque' | 'custoMedio' | 'valorUnitario'>>
     >`
-      SELECT quantidade_estoque AS quantidadeEstoque, custo_medio AS custoMedio
+      SELECT quantidade_estoque AS quantidadeEstoque, custo_medio AS custoMedio, valor_unitario AS valorUnitario
       FROM produtos WHERE id = ${produtoId} FOR UPDATE
     `;
     if (!produto) {
@@ -110,6 +110,9 @@ export class MovimentacoesRepository {
 
     const estoqueAtual = Number(produto.quantidadeEstoque);
     const custoMedioAtual = Number(produto.custoMedio);
+    const custoUnitario =
+      params.custoUnitario ??
+      (tipo === 'SAIDA' ? custoMedioAtual : Number(produto.valorUnitario));
 
     let novoEstoque: number;
     let novoCustoMedio = custoMedioAtual;
@@ -149,7 +152,7 @@ export class MovimentacoesRepository {
         tipo,
         quantidade,
         custoUnitario,
-        valorTotal: quantidade * custoUnitario,
+        valorTotal: itemTotal(quantidade, custoUnitario),
         motivo,
         usuarioId,
         compraId: compraId ?? null,

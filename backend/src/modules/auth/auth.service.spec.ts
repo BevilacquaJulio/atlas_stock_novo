@@ -1,136 +1,97 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { describe, it, expect, vi } from 'vitest';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { UsuariosRepository } from '../usuarios/usuarios.repository';
 import { RefreshTokenRepository } from './refresh-token.repository';
+import { hashPassword, verifyPassword } from '../../common/auth/password';
 
-describe('AuthService.login', () => {
-  let usuarios: { findByEmailWithSenha: ReturnType<typeof vi.fn>; findById: ReturnType<typeof vi.fn> };
-  let refreshTokens: {
-    createEmpty: ReturnType<typeof vi.fn>;
-    setHash: ReturnType<typeof vi.fn>;
-    withUserLock: ReturnType<typeof vi.fn>;
-  };
-  let jwt: { signAsync: ReturnType<typeof vi.fn> };
-  let config: { get: ReturnType<typeof vi.fn> };
-  let service: AuthService;
-
-  beforeEach(() => {
-    usuarios = { findByEmailWithSenha: vi.fn(), findById: vi.fn().mockResolvedValue({ id: 1, nome: 'Admin', email: 'a@b.com', cargo: 'ADMINISTRADOR', ativo: true }) };
-    refreshTokens = {
-      createEmpty: vi.fn().mockResolvedValue({ id: 10 }),
-      setHash: vi.fn().mockResolvedValue(undefined),
-      withUserLock: vi.fn((_id, run) => run({})),
-    };
-    jwt = { signAsync: vi.fn().mockResolvedValue('signed.jwt.token') };
-    config = { get: vi.fn().mockReturnValue('7d') };
-    service = new AuthService(
-      usuarios as unknown as UsuariosRepository,
-      refreshTokens as unknown as RefreshTokenRepository,
-      jwt as never,
-      config as never,
-    );
-  });
-
-  it('emite tokens com credenciais válidas', async () => {
-    const senhaHash = await bcrypt.hash('secret123', 10);
-    usuarios.findByEmailWithSenha.mockResolvedValue({
-      id: 1,
-      nome: 'Admin',
-      email: 'a@b.com',
-      senha: senhaHash,
-      cargo: 'ADMINISTRADOR',
-      ativo: true,
-    });
-
-    const result = await service.login('a@b.com', 'secret123');
-
-    expect(result.accessToken).toBe('signed.jwt.token');
-    expect(result.refreshToken).toBe('signed.jwt.token');
-    expect(result.user).toMatchObject({ id: 1, cargo: 'ADMINISTRADOR' });
-    // Permissão efetiva: administrador sempre tem acesso financeiro.
-    expect(result.user.acessoFinanceiro).toBe(true);
-  });
-
-  it('rejeita senha incorreta com 401', async () => {
-    const senhaHash = await bcrypt.hash('secret123', 10);
-    usuarios.findByEmailWithSenha.mockResolvedValue({
-      id: 1,
-      nome: 'Admin',
-      email: 'a@b.com',
-      senha: senhaHash,
-      cargo: 'OPERADOR',
-      ativo: true,
-    });
-    await expect(service.login('a@b.com', 'errada')).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
-  });
-
-  it('rejeita usuário inativo com 401', async () => {
-    usuarios.findByEmailWithSenha.mockResolvedValue({
-      id: 1,
-      senha: 'x',
-      ativo: false,
-    });
-    await expect(service.login('a@b.com', 'x')).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
-  });
-});
-
-describe('AuthService.reautenticar', () => {
+async function fixture(legacy = true) {
+  const senha = legacy
+    ? await bcrypt.hash('synthetic-password', 4)
+    : await hashPassword('synthetic-password');
   const user = {
-    id: 3,
-    nome: 'Gerente',
-    email: 'g@b.com',
-    cargo: 'GERENTE' as const,
-    acessoFinanceiro: true,
+    id: 1,
+    nome: 'Admin',
+    email: 'admin@example.test',
+    cargo: 'ADMINISTRADOR' as const,
+    ativo: true,
+    acessoFinanceiro: false,
+    senha,
+    mfaAtivo: false,
+    mfaSegredo: null,
+    mfaRecuperacao: null,
+    mfaUltimoPasso: 0,
   };
-  let usuarios: { findByIdWithSenha: ReturnType<typeof vi.fn> };
-  let jwt: { signAsync: ReturnType<typeof vi.fn> };
-  let service: AuthService;
+  const tx = {
+    usuario: { update: vi.fn() },
+    sessao: { create: vi.fn(async ({ data }) => data) },
+  };
+  const usuarios = {
+    findByEmailWithSenha: vi.fn().mockResolvedValue(user),
+    findByIdWithSenha: vi.fn().mockResolvedValue(user),
+  };
+  const tokens = {
+    withUserLock: vi.fn((_id, run) => run(tx)),
+    create: vi.fn(),
+  };
+  const jwt = { signAsync: vi.fn().mockResolvedValue('signed-access') };
+  const service = new AuthService(
+    usuarios as unknown as UsuariosRepository,
+    tokens as unknown as RefreshTokenRepository,
+    jwt as unknown as JwtService,
+    new ConfigService({ JWT_ACCESS_SECRET: 'synthetic-access-secret' }),
+  );
+  return { user, tx, usuarios, tokens, jwt, service };
+}
 
-  beforeEach(async () => {
-    usuarios = {
-      findByIdWithSenha: vi.fn().mockResolvedValue({
-        id: 3,
-        ativo: true,
-        senha: await bcrypt.hash('senha-do-gerente', 4),
-      }),
-    };
-    jwt = { signAsync: vi.fn().mockResolvedValue('token.reautenticacao') };
-    service = new AuthService(
-      usuarios as unknown as UsuariosRepository,
-      {} as RefreshTokenRepository,
-      jwt as never,
-      { get: vi.fn().mockReturnValue('segredo') } as never,
+describe('login e confirmação de senha', () => {
+  it.each([true, false])(
+    'preserva login e migra bcrypt=%s para Argon2id',
+    async (legacy) => {
+      const f = await fixture(legacy);
+      const result = await f.service.login(f.user.email, 'synthetic-password');
+      expect(result.accessToken).toBe('signed-access');
+      expect(result.refreshToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect(result.user.acessoFinanceiro).toBe(true);
+      expect(result.user).not.toHaveProperty('senha');
+      if (legacy) {
+        const hash = f.tx.usuario.update.mock.calls[0][0].data.senha;
+        expect(hash).toMatch(/^\$argon2id\$/);
+        expect(await verifyPassword(hash, 'synthetic-password')).toBe(true);
+      } else expect(f.tx.usuario.update).not.toHaveBeenCalled();
+    },
+  );
+  it('nega senha errada e conta inativa sem emitir credenciais', async () => {
+    const f = await fixture();
+    await expect(f.service.login(f.user.email, 'errada')).rejects.toThrow(
+      'Credenciais inválidas',
     );
-  });
-
-  it('emite token curto de reautenticação para a própria senha', async () => {
-    const result = await service.reautenticar(user, 'senha-do-gerente');
-
-    expect(result).toEqual({ token: 'token.reautenticacao', expiresIn: 600 });
-    expect(jwt.signAsync).toHaveBeenCalledWith(
-      { purpose: 'reautenticacao', sub: 3 },
-      expect.objectContaining({ expiresIn: 600, algorithm: 'HS256' }),
-    );
-  });
-
-  it('senha errada ou usuário inativo respondem 400 sem emitir token', async () => {
-    await expect(service.reautenticar(user, 'errada')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    usuarios.findByIdWithSenha.mockResolvedValue({
-      id: 3,
+    f.usuarios.findByEmailWithSenha.mockResolvedValue({
+      ...f.user,
       ativo: false,
-      senha: await bcrypt.hash('senha-do-gerente', 4),
     });
     await expect(
-      service.reautenticar(user, 'senha-do-gerente'),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(jwt.signAsync).not.toHaveBeenCalled();
+      f.service.login(f.user.email, 'synthetic-password'),
+    ).rejects.toThrow('Credenciais inválidas');
+    expect(f.jwt.signAsync).not.toHaveBeenCalled();
+  });
+  it('confirma a senha do usuário e vincula o comprovante à sessão', async () => {
+    const f = await fixture();
+    const user = {
+      ...f.user,
+      sessaoId: '11111111-1111-4111-8111-111111111111',
+    };
+    await expect(f.service.reautenticar(user, 'errada')).rejects.toThrow(
+      'Senha incorreta',
+    );
+    await expect(
+      f.service.reautenticar(user, 'synthetic-password'),
+    ).resolves.toEqual({ token: 'signed-access', expiresIn: 600 });
+    expect(f.jwt.signAsync).toHaveBeenCalledWith(
+      { purpose: 'reautenticacao', sub: 1, sid: user.sessaoId },
+      expect.objectContaining({ expiresIn: 600 }),
+    );
   });
 });

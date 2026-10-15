@@ -17,11 +17,11 @@ Interface do ERP de blindagem de veículos. Migração do frontend PHP/vanilla p
 
 1. **Instalar**
    ```bash
-   npm install
+   npm ci
    ```
 2. **Configurar** — copie `.env.example` para `.env`:
    ```bash
-   cp .env.example .env   # VITE_API_URL=http://localhost:3000/api
+   cp .env.example .env   # VITE_API_URL vazio usa /api via proxy Vite
    ```
 3. **Subir** (com o backend já rodando):
    ```bash
@@ -47,17 +47,21 @@ src/
 ```
 
 ### Autenticação
-- Access token vive **em memória**; refresh token em `localStorage`.
+
+- Access token vive **em memória**; refresh opaco fica em cookie HttpOnly. O armazenamento legado é removido.
 - O interceptor do axios anexa o Bearer token e, em 401, tenta **refresh
   automático** uma vez antes de deslogar.
 - `AuthProvider` + `useAuth` expõem `user`, `status`, `login`, `logout`.
 - `ProtectedRoute` bloqueia rotas autenticadas.
+- Web Locks serializa login, renovação e logout entre abas; notificações de troca de sessão não transportam tokens.
+- Use HTTPS em produção. O contrato de cookie exige Origin exato e `X-Atlas-Client: web`; o cliente central envia credenciais.
+- Segurança da conta inclui senha, MFA e sessões. Recuperação usa link gerado pelo administrador, de uso único e validade de 15 minutos.
 
 ## Módulos (Fase 1 — Cadastros)
 
 Clientes, Veículos, Produtos, Fornecedores, Categorias e Movimentações de
 estoque — cada um com listagem paginada + busca e formulário de criação/edição.
-Dashboard em `/`, Financeiro em `/financeiro` (senha de desbloqueio para não-admin).
+Dashboard em `/`; Financeiro em `/financeiro`, liberado a administradores e gerentes com permissão explícita. Ações críticas pedem a própria senha.
 
 ## Testes
 

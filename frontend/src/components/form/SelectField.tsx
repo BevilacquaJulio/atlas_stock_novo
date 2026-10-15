@@ -63,19 +63,18 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
         selectRef.current = node;
         if (typeof ref === 'function') ref(node);
         else if (ref) ref.current = node;
+        if (node) setValue(node.value);
       },
       [ref],
     );
 
-    // Sincroniza o rótulo com o valor real do <select> a cada render
-    // (cobre reset() e mudanças programáticas do react-hook-form).
-    useEffect(() => {
-      const node = selectRef.current;
-      if (node && node.value !== value) setValue(node.value);
-    });
-
-    const selectedIndex = options.findIndex((o) => String(o.value) === value);
-    const selectedLabel = selectedIndex >= 0 ? options[selectedIndex].label : '';
+    const currentValue =
+      props.value !== undefined ? String(props.value) : value;
+    const selectedIndex = options.findIndex(
+      (o) => String(o.value) === currentValue,
+    );
+    const selectedLabel =
+      selectedIndex >= 0 ? options[selectedIndex].label : '';
 
     const commit = useCallback((next: string) => {
       const node = selectRef.current;
@@ -111,8 +110,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
     useEffect(() => {
       if (!open || activeIndex < 0) return;
       const el = listRef.current?.children[activeIndex] as
-        | HTMLElement
-        | undefined;
+        HTMLElement | undefined;
       el?.scrollIntoView({ block: 'nearest' });
     }, [open, activeIndex]);
 
@@ -220,7 +218,9 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
           >
             <span
               className={
-                selectedLabel ? 'truncate text-[#0a0a0a]' : 'truncate text-[#0a0a0a]/40'
+                selectedLabel
+                  ? 'truncate text-[#0a0a0a]'
+                  : 'truncate text-[#0a0a0a]/40'
               }
             >
               {selectedLabel || placeholder || 'Selecione'}
@@ -251,7 +251,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
                 {placeholder && (
                   <SelectOption
                     active={activeIndex === -1}
-                    selected={value === ''}
+                    selected={currentValue === ''}
                     muted
                     onSelect={() => {
                       commit('');
@@ -266,7 +266,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
                   <SelectOption
                     key={opt.value}
                     active={i === activeIndex}
-                    selected={String(opt.value) === value}
+                    selected={String(opt.value) === currentValue}
                     onSelect={() => {
                       commit(String(opt.value));
                       closeList();
@@ -326,7 +326,12 @@ function SelectOption({
     >
       <span className="truncate">{children}</span>
       {selected && (
-        <IconCheck width={15} height={15} aria-hidden="true" className="shrink-0" />
+        <IconCheck
+          width={15}
+          height={15}
+          aria-hidden="true"
+          className="shrink-0"
+        />
       )}
     </li>
   );

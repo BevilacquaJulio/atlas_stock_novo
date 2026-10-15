@@ -24,7 +24,7 @@ function fixture(status: string) {
     compra: { findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 1 }) },
   };
   const movements = { registrar: vi.fn() };
-  const prisma = { $transaction: vi.fn((run) => run(tx)) };
+  const prisma = { withAudit: vi.fn((run) => run(tx)) };
   const service = new ComprasService(
     repo as unknown as ComprasRepository,
     {} as FornecedoresRepository,

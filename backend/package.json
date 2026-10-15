@@ -24,7 +24,8 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
-    "test:cov": "vitest run --coverage"
+    "test:cov": "vitest run --coverage --config vitest.all.config.ts",
+    "test:upgrade": "node scripts/verify-upgrade.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -36,6 +37,7 @@
     "@nestjs/throttler": "^6.3.0",
     "@prisma/adapter-mariadb": "^7.0.0",
     "@prisma/client": "^7.10.0",
+    "argon2": "0.45.1",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.4.1",
     "helmet": "^8.0.0",
@@ -71,7 +73,7 @@
     "@types/supertest": "^6.0.2",
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
-    "@vitest/coverage-v8": "^3.2.7",
+    "@vitest/coverage-v8": "4.1.11",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-prettier": "^5.2.1",
@@ -83,6 +85,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^6.0.3",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.0.0"
+    "vitest": "4.1.11"
   }
 }

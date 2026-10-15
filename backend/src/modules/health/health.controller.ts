@@ -18,7 +18,20 @@ export class HealthController {
   @Get('ready')
   async readiness(): Promise<{ status: string; database: string }> {
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      let deadline: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          this.prisma.$queryRaw`SELECT 1`,
+          new Promise<never>((_resolve, reject) => {
+            deadline = setTimeout(
+              () => reject(new Error('Readiness timeout')),
+              3000,
+            );
+          }),
+        ]);
+      } finally {
+        clearTimeout(deadline);
+      }
       return { status: 'ok', database: 'up' };
     } catch {
       throw new ServiceUnavailableException('Banco indisponível.');

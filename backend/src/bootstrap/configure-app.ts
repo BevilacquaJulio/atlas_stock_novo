@@ -9,6 +9,13 @@ import helmet from 'helmet';
 
 export function configureApp(app: NestExpressApplication): void {
   const config = app.get(ConfigService);
+  const proxies = config
+    .get<string>('TRUST_PROXY', '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  app.set('trust proxy', proxies.length ? proxies : false);
+  app.enableShutdownHooks();
   app.use((req: Request, res: Response, next: NextFunction) => {
     req.id = randomUUID();
     res.setHeader('X-Request-Id', req.id);

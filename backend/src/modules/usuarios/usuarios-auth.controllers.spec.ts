@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { describe, expect, it, vi } from 'vitest';
 import { UsuariosController } from './usuarios.controller';
 import type { UsuariosService } from './usuarios.service';
@@ -37,19 +38,28 @@ describe('handlers de usuários e reautenticação', () => {
 
     expect(service.list).toHaveBeenCalled();
     expect(service.create).toHaveBeenCalledWith(novo);
-    expect(service.atualizarAcesso).toHaveBeenCalledWith(2, { cargo: 'GERENTE' });
+    expect(service.atualizarAcesso).toHaveBeenCalledWith(2, {
+      cargo: 'GERENTE',
+    });
   });
 
   it('reautenticar usa o usuário autenticado, nunca um id do corpo', async () => {
     const service = {
       reautenticar: vi.fn().mockResolvedValue({ token: 't', expiresIn: 600 }),
     };
-    const controller = new AuthController(service as unknown as AuthService);
+    const controller = new AuthController(
+      service as unknown as AuthService,
+      new ConfigService(),
+    );
 
     await expect(
       controller.reautenticar({ senha: 'minha-senha' }, admin),
     ).resolves.toEqual({ token: 't', expiresIn: 600 });
-    expect(service.reautenticar).toHaveBeenCalledWith(admin, 'minha-senha');
+    expect(service.reautenticar).toHaveBeenCalledWith(
+      admin,
+      'minha-senha',
+      undefined,
+    );
     expect(controller.me(admin)).toBe(admin);
   });
 });

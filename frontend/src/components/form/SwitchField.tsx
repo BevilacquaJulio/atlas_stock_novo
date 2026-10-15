@@ -1,7 +1,6 @@
 import {
   forwardRef,
   useCallback,
-  useEffect,
   useId,
   useRef,
   useState,
@@ -9,8 +8,10 @@ import {
 } from 'react';
 import { motion } from 'framer-motion';
 
-interface SwitchFieldProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
+interface SwitchFieldProps extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'type'
+> {
   label?: string;
   description?: string;
 }
@@ -37,7 +38,9 @@ export const SwitchField = forwardRef<HTMLInputElement, SwitchFieldProps>(
     const generatedId = useId();
     const fieldId = id ?? generatedId;
     const inputRef = useRef<HTMLInputElement | null>(null);
-    const [checked, setChecked] = useState(Boolean(props.defaultChecked ?? props.checked));
+    const [checked, setChecked] = useState(
+      Boolean(props.defaultChecked ?? props.checked),
+    );
 
     const setRefs = useCallback(
       (node: HTMLInputElement | null) => {
@@ -48,12 +51,6 @@ export const SwitchField = forwardRef<HTMLInputElement, SwitchFieldProps>(
       },
       [ref],
     );
-
-    // Cobre reset() e mudanças programáticas do RHF.
-    useEffect(() => {
-      const node = inputRef.current;
-      if (node && node.checked !== checked) setChecked(node.checked);
-    });
 
     const toggle = () => {
       const node = inputRef.current;

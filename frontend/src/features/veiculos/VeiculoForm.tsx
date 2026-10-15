@@ -1,14 +1,12 @@
+import { RemoteSelectField } from '../../components/form/RemoteSelectField';
 import { semCampoAtivo, usePermissoes } from '../auth/permissoes';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
 import { TextField } from '../../components/form/TextField';
-import { SelectField } from '../../components/form/SelectField';
 import { TextareaField } from '../../components/form/TextareaField';
 import { SwitchField } from '../../components/form/SwitchField';
 import { Alert } from '../../components/feedback';
-import { listClientes } from '../clientes/clientes.api';
 import type { Veiculo, VeiculoFormValues } from './veiculos.types';
 
 const schema = z.object({
@@ -32,11 +30,6 @@ export function VeiculoForm({
   onSubmit: (values: VeiculoFormValues) => void;
   error?: string | null;
 }) {
-  const clientesQuery = useQuery({
-    queryKey: ['clientes', 'options'],
-    queryFn: () => listClientes({ limit: 100, ativo: true }),
-  });
-
   const { gestao } = usePermissoes();
   const {
     register,
@@ -56,12 +49,6 @@ export function VeiculoForm({
     },
   });
 
-  const clienteOptions =
-    clientesQuery.data?.data.map((c) => ({
-      value: c.id,
-      label: c.nomeCompleto,
-    })) ?? [];
-
   return (
     <form
       id="veiculo-form"
@@ -71,13 +58,12 @@ export function VeiculoForm({
       className="flex flex-col gap-4"
     >
       {error && <Alert kind="error">{error}</Alert>}
-      <SelectField
+      <RemoteSelectField
         label="Cliente"
-        placeholder={
-          clientesQuery.isLoading ? 'Carregando…' : 'Selecione o cliente'
-        }
+        placeholder="Selecione"
         error={errors.clienteId?.message}
-        options={clienteOptions}
+        source="clientes"
+        initialValue={initial?.clienteId}
         {...register('clienteId')}
       />
       <div className="grid gap-4 sm:grid-cols-2">

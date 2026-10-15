@@ -5,6 +5,8 @@ import { AppLayout } from './AppLayout';
 import { Spinner } from '../components/feedback';
 
 const LoginPage = lazy(() => import('../features/auth/LoginPage'));
+const RecoveryPage = lazy(() => import('../features/auth/RecoveryPage'));
+const SecurityPage = lazy(() => import('../features/auth/SecurityPage'));
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
 const FinanceiroPage = lazy(
   () => import('../features/financeiro/FinanceiroPage'),
@@ -32,6 +34,14 @@ export function App() {
   return (
     <Routes>
       <Route
+        path="/recuperar"
+        element={
+          <Suspense fallback={<Spinner />}>
+            <RecoveryPage />
+          </Suspense>
+        }
+      />
+      <Route
         path="/login"
         element={
           <Suspense
@@ -51,10 +61,7 @@ export function App() {
           <Route path="cadastros/clientes" element={<ClientesPage />} />
           <Route path="cadastros/veiculos" element={<VeiculosPage />} />
           <Route path="cadastros/produtos" element={<ProdutosPage />} />
-          <Route
-            path="cadastros/fornecedores"
-            element={<FornecedoresPage />}
-          />
+          <Route path="cadastros/fornecedores" element={<FornecedoresPage />} />
           <Route path="cadastros/categorias" element={<CategoriasPage />} />
           <Route
             path="cadastros/movimentacoes"
@@ -65,6 +72,7 @@ export function App() {
           <Route path="projetos/:id" element={<ProjetoDetalhesPage />} />
           <Route path="financeiro" element={<FinanceiroPage />} />
           <Route path="usuarios" element={<UsuariosPage />} />
+          <Route path="seguranca" element={<SecurityPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

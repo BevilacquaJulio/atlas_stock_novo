@@ -36,25 +36,18 @@ export class MovimentacoesService {
     const produto = await this.produtos.findById(input.produtoId);
     if (!produto) throw new NotFoundException('Produto não encontrado.');
 
-    // Para ENTRADA sem custo informado, usa o valor unitário do produto.
-    const custoUnitario =
-      input.custoUnitario ??
-      (input.tipo === 'ENTRADA' ? Number(produto.valorUnitario) : Number(produto.custoMedio));
-
     try {
       return await this.repo.registrar({
         produtoId: input.produtoId,
         tipo: input.tipo,
         quantidade: input.quantidade,
-        custoUnitario,
+        custoUnitario: input.custoUnitario,
         motivo: input.motivo ?? null,
         usuarioId,
       });
     } catch (err) {
       if (err instanceof Error && err.message === 'ESTOQUE_INSUFICIENTE') {
-        throw new BadRequestException(
-          'Estoque insuficiente para esta saída.',
-        );
+        throw new BadRequestException('Estoque insuficiente para esta saída.');
       }
       throw err;
     }

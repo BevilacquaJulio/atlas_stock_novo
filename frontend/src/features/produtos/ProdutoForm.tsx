@@ -1,18 +1,14 @@
+import { RemoteSelectField } from '../../components/form/RemoteSelectField';
 import { semCampoAtivo, usePermissoes } from '../auth/permissoes';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
 import { TextField } from '../../components/form/TextField';
-import { SelectField } from '../../components/form/SelectField';
 import { TextareaField } from '../../components/form/TextareaField';
 import { SwitchField } from '../../components/form/SwitchField';
 import { UnidadeMedidaField } from '../../components/form/UnidadeMedidaField';
 import { Alert } from '../../components/feedback';
-import {
-  resolveUnidadeMedidaOptions,
-} from '../../lib/unidades-medida';
-import { listCategorias } from '../categorias/categorias.api';
+import { resolveUnidadeMedidaOptions } from '../../lib/unidades-medida';
 import type { Produto, ProdutoFormValues } from './produtos.types';
 
 const schema = z.object({
@@ -37,10 +33,6 @@ export function ProdutoForm({
   error?: string | null;
 }) {
   const isEdit = Boolean(initial);
-  const categoriasQuery = useQuery({
-    queryKey: ['categorias', 'options'],
-    queryFn: () => listCategorias({ limit: 100 }),
-  });
 
   const unidadeOptions = resolveUnidadeMedidaOptions(initial?.unidadeMedida);
 
@@ -62,10 +54,6 @@ export function ProdutoForm({
       ativo: initial?.ativo ?? true,
     },
   });
-
-  const categoriaOptions =
-    categoriasQuery.data?.data.map((c) => ({ value: c.id, label: c.nome })) ??
-    [];
 
   return (
     <form
@@ -95,13 +83,12 @@ export function ProdutoForm({
         {...register('unidadeMedida')}
       />
 
-      <SelectField
+      <RemoteSelectField
         label="Categoria"
-        placeholder={
-          categoriasQuery.isLoading ? 'Carregando…' : 'Selecione a categoria'
-        }
+        placeholder="Selecione"
         error={errors.categoriaId?.message}
-        options={categoriaOptions}
+        source="categorias"
+        initialValue={initial?.categoriaId}
         {...register('categoriaId')}
       />
       <div className="grid gap-4 sm:grid-cols-2">

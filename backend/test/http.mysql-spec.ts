@@ -10,6 +10,11 @@ import { testDatabase } from './mysql-fixture';
 
 const prisma = testDatabase();
 const api = request('http://127.0.0.1:13317');
+const post = api.post.bind(api);
+api.post = (path: string) =>
+  post(path)
+    .set('Origin', 'http://localhost:5173')
+    .set('X-Atlas-Client', 'web');
 const marker = randomUUID();
 const email = `http-${marker}@example.test`;
 const password = `synthetic-${marker}`;
@@ -28,9 +33,17 @@ const extraUserIds: number[] = [];
 
 /** Access token assinado como a API faz; evita logins que contam no limite. */
 async function accessFor(id: number, cargo: string) {
+  const session = await prisma.sessao.create({
+    data: {
+      id: randomUUID(),
+      usuarioId: id,
+      expiraEm: new Date(Date.now() + 3600000),
+    },
+  });
   return new JwtService().signAsync(
     {
       purpose: 'access',
+      sid: session.id,
       sub: id,
       email: `x-${id}@example.test`,
       cargo,
@@ -120,7 +133,10 @@ beforeAll(async () => {
     .expect(200);
   expect(login.body.user).not.toHaveProperty('senha');
   token = login.body.accessToken;
-  refreshToken = login.body.refreshToken;
+  refreshToken = String(login.headers['set-cookie'][0])
+    .split(';')[0]
+    .split('=')[1];
+  expect(login.body).not.toHaveProperty('refreshToken');
 });
 
 afterAll(async () => {
@@ -541,6 +557,87 @@ describe('pipeline HTTP real em MySQL isolado', () => {
       acessoFinanceiro: true,
     });
     expect(promovido.body).not.toHaveProperty('senha');
+  });
+
+  it('cookie refresh é HttpOnly/Secure e endpoints de cookie exigem origem e cabeçalho', async () => {
+    await api
+      .post('/api/auth/refresh')
+      .set('Origin', 'https://evil.example')
+      .set('Cookie', `atlas_refresh=${refreshToken}`)
+      .expect(403);
+    await api
+      .post('/api/auth/refresh')
+      .unset('X-Atlas-Client')
+      .set('Cookie', `atlas_refresh=${refreshToken}`)
+      .expect(403);
+    const rotated = await api
+      .post('/api/auth/refresh')
+      .set('Cookie', `atlas_refresh=${refreshToken}`)
+      .expect(200);
+    expect(rotated.body).not.toHaveProperty('refreshToken');
+    const cookie = String(rotated.headers['set-cookie'][0]);
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('Secure');
+    expect(cookie).toContain('SameSite=Strict');
+    expect(cookie).toContain('Path=/api/auth');
+    expect(rotated.headers['cache-control']).toBe('no-store');
+    refreshToken = cookie.split(';')[0].split('=')[1];
+  });
+
+  it('mesma chave de compra repete a resposta sem duplicar compra/despesa', async () => {
+    const body = {
+      fornecedorId: supplierId,
+      itens: [{ produtoId: productId, quantidade: 0.5, valorUnitario: 0.01 }],
+    };
+    const key = randomUUID();
+    const first = await api
+      .post('/api/compras')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', key)
+      .send(body)
+      .expect(201);
+    purchaseIds.push(first.body.id);
+    const repeated = await api
+      .post('/api/compras')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', key)
+      .send(body)
+      .expect(201);
+    expect(repeated.body.id).toBe(first.body.id);
+    expect(Number(first.body.valorTotal)).toBe(0.01);
+    expect(
+      await prisma.despesa.count({ where: { compraId: first.body.id } }),
+    ).toBe(1);
+    await api
+      .post('/api/compras')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', key)
+      .send({ ...body, observacoes: 'Outra operação' })
+      .expect(409);
+  });
+
+  it('confirmação de senha de outra sessão do mesmo usuário não autoriza ação crítica', async () => {
+    const confirmation = await new JwtService().signAsync(
+      {
+        purpose: 'reautenticacao',
+        sub: userId,
+        sid: new JwtService().decode<{ sid: string }>(token).sid,
+      },
+      {
+        issuer: jwtPolicy.issuer,
+        audience: jwtPolicy.audience,
+        secret: accessSecret,
+        algorithm: 'HS256',
+        expiresIn: 600,
+      },
+    );
+    const otherToken = await accessFor(userId!, 'ADMINISTRADOR');
+    await api
+      .patch(`/api/usuarios/${userId}/acesso`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .set('X-Reautenticacao', confirmation)
+      .send({ cargo: 'ADMINISTRADOR' })
+      .expect(403);
   });
 
   it('bloqueia tentativas de login após o limite específico de dez por minuto', async () => {

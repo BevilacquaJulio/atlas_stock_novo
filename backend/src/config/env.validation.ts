@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isIP } from 'node:net';
 
 const duration = (min: number, max: number) =>
   z
@@ -35,8 +36,39 @@ export const envSchema = z
     // JWT — segredos distintos para access e refresh
     JWT_ACCESS_SECRET: z.string().min(32),
     JWT_ACCESS_EXPIRES_IN: duration(300, 900).default('15m'),
-    JWT_REFRESH_SECRET: z.string().min(32),
-    JWT_REFRESH_EXPIRES_IN: duration(3600, 30 * 86400).default('7d'),
+    REFRESH_TOKEN_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(3600)
+      .max(2592000)
+      .default(604800),
+    COOKIE_SECURE: z.enum(['true', 'false']).optional(),
+    MFA_ENCRYPTION_KEY: z
+      .string()
+      .regex(/^[a-fA-F0-9]{64}$/)
+      .optional()
+      .or(z.literal(''))
+      .transform((value) => value || undefined),
+    REQUIRE_PRIVILEGED_MFA: z.enum(['true', 'false']).default('false'),
+    TRUST_PROXY: z
+      .string()
+      .default('')
+      .refine(
+        (value) =>
+          !value ||
+          value.split(',').every((entry) => {
+            const [address, mask, extra] = entry.trim().split('/');
+            const version = isIP(address);
+            return (
+              !extra &&
+              !!version &&
+              (mask === undefined ||
+                (/^\d+$/.test(mask) &&
+                  Number(mask) <= (version === 4 ? 32 : 128)))
+            );
+          }),
+        'Use somente IPs/CIDRs dos proxies reais.',
+      ),
 
     // Segurança
     CORS_ORIGIN: z
@@ -61,15 +93,21 @@ export const envSchema = z
     THROTTLE_LIMIT: z.coerce.number().int().positive().default(120),
   })
   .superRefine((env, ctx) => {
-    if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['JWT_REFRESH_SECRET'],
-        message: 'Use segredos distintos.',
-      });
-    }
     if (env.NODE_ENV === 'production') {
-      for (const key of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const) {
+      if (
+        env.COOKIE_SECURE === 'false' &&
+        !env.CORS_ORIGIN.split(',').every((origin) =>
+          /^http:\/\/[a-z0-9-]+\.localhost$/.test(origin.trim()),
+        )
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['COOKIE_SECURE'],
+          message:
+            'Cookie sem Secure é permitido somente em domínio local .localhost.',
+        });
+      }
+      for (const key of ['JWT_ACCESS_SECRET'] as const) {
         if (/troque|example|change.?me|placeholder/i.test(env[key])) {
           ctx.addIssue({
             code: 'custom',

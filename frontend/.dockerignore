@@ -7,3 +7,10 @@ dist
 .gitignore
 *.log
 coverage
+
+playwright-report
+test-results
+playwright/.auth
+secrets
+*.dump
+*.sql.gz

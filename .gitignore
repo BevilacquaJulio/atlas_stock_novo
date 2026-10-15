@@ -59,7 +59,6 @@ test-results/
 # -----------------------------------------------------------------------------
 # Banco de dados — dumps e backups (nunca versionar dados reais)
 # -----------------------------------------------------------------------------
-sql/
 *.sql.gz
 *.dump
 sql/dumps/
@@ -107,6 +106,7 @@ $RECYCLE.BIN/
 # IDEs e editores
 # -----------------------------------------------------------------------------
 .idea/
+.cursor/
 *.iml
 .vscode/
 !.vscode/extensions.json
@@ -114,11 +114,6 @@ $RECYCLE.BIN/
 *.sublime-project
 *.sublime-workspace
 *.code-workspace
-.cursor/
-**/.claude
-**/.claude/**
-**/skills/
-**/SKILL.md
 
 # -----------------------------------------------------------------------------
 # Backups e arquivos temporários de editores
@@ -138,3 +133,9 @@ $RECYCLE.BIN/
 *.tar.gz
 *.rar
 *.7z
+
+# Compose local é configuração pessoal.
+docker-compose.local.yml
+playwright/.auth/
+
+backups/

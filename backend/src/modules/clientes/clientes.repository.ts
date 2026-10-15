@@ -12,7 +12,7 @@ export class ClientesRepository {
         where,
         skip,
         take,
-        orderBy: { nomeCompleto: 'asc' },
+        orderBy: [{ nomeCompleto: 'asc' }, { id: 'asc' }],
       }),
       this.prisma.cliente.count({ where }),
     ]);

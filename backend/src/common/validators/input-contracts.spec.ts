@@ -36,10 +36,9 @@ describe('contratos de autenticação e cadastros', () => {
       { email: 'user@example.test', senha: 'pass', cargo: 'ADMINISTRADOR' },
     ])
       expect(loginSchema.safeParse(input).success).toBe(false);
-    expect(
-      refreshSchema.parse({ refreshToken: 'x'.repeat(2048) }).refreshToken,
-    ).toHaveLength(2048);
-    for (const token of ['', 'short', 'x'.repeat(2049)])
+    expect(refreshSchema.parse({})).toEqual({});
+    expect(refreshSchema.parse(undefined)).toEqual({});
+    for (const token of ['', 'short', 'x'.repeat(43), 'x'.repeat(2049)])
       expect(refreshSchema.safeParse({ refreshToken: token }).success).toBe(
         false,
       );

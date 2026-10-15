@@ -1,0 +1,5 @@
+-- Execute como DBA no ambiente autorizado, após preencher as senhas.
+CREATE DATABASE IF NOT EXISTS atlas_estoque CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'atlas_app'@'%' IDENTIFIED BY 'TROQUE_SENHA_RUNTIME';
+CREATE USER IF NOT EXISTS 'atlas_migrate'@'%' IDENTIFIED BY 'TROQUE_SENHA_MIGRATION';
+GRANT ALL PRIVILEGES ON atlas_estoque.* TO 'atlas_migrate'@'%';

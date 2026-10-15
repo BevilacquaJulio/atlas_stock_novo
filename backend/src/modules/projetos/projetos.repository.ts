@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { itemTotal } from '../../common/money';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { Prisma } from '../../../generated/prisma/client';
 import type {
@@ -42,11 +43,7 @@ const projetoInclude = {
 export class ProjetosRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findMany(
-    where: Prisma.ProjetoWhereInput,
-    skip: number,
-    take: number,
-  ) {
+  async findMany(where: Prisma.ProjetoWhereInput, skip: number, take: number) {
     const [data, total] = await Promise.all([
       this.prisma.projeto.findMany({
         where,
@@ -79,7 +76,20 @@ export class ProjetosRepository {
         ? input.checklistInicial
         : CHECKLIST_PADRAO;
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.withAudit(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM veiculos WHERE id = ${input.veiculoId} FOR UPDATE`;
+      const vehicle = await tx.veiculo.findFirst({
+        where: {
+          id: input.veiculoId,
+          clienteId: input.clienteId,
+          ativo: true,
+          cliente: { ativo: true },
+        },
+      });
+      if (!vehicle)
+        throw new BadRequestException(
+          'Cliente ou veículo inválido, inativo ou com vínculo alterado.',
+        );
       const projeto = await tx.projeto.create({
         data: {
           clienteId: input.clienteId,
@@ -122,30 +132,31 @@ export class ProjetosRepository {
     data: {
       status: 'AGUARDANDO' | 'EM_ANDAMENTO' | 'CONCLUIDO' | 'CANCELADO';
       statusAnterior:
-        | 'AGUARDANDO'
-        | 'EM_ANDAMENTO'
-        | 'CONCLUIDO'
-        | 'CANCELADO'
-        | null;
+        'AGUARDANDO' | 'EM_ANDAMENTO' | 'CONCLUIDO' | 'CANCELADO' | null;
       observacao: string | null;
       usuarioId: number;
       dataInicio?: Date | null;
       dataConclusao?: Date | null;
     },
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.withAudit(async (tx) => {
       const changed = await tx.projeto.updateMany({
         where: { id, ativo: true, status: data.statusAnterior ?? undefined },
         data: {
           status: data.status,
-          ...(data.dataInicio !== undefined ? { dataInicio: data.dataInicio } : {}),
+          ...(data.dataInicio !== undefined
+            ? { dataInicio: data.dataInicio }
+            : {}),
           ...(data.dataConclusao !== undefined
             ? { dataConclusao: data.dataConclusao }
             : {}),
         },
       });
 
-      if (changed.count !== 1) throw new BadRequestException('O projeto mudou de status. Atualize a página.');
+      if (changed.count !== 1)
+        throw new BadRequestException(
+          'O projeto mudou de status. Atualize a página.',
+        );
 
       await tx.projetoHistorico.create({
         data: {
@@ -173,29 +184,44 @@ export class ProjetosRepository {
   }
 
   addChecklistItem(projetoId: number, input: CreateChecklistItemInput) {
-    return this.prisma.projetoChecklistItem.create({
-      data: {
-        projetoId,
-        descricao: input.descricao,
-        ordem: input.ordem ?? 0,
-      },
+    return this.prisma.withAudit(async (tx) => {
+      await this.lockOpenProject(projetoId, tx);
+      return tx.projetoChecklistItem.create({
+        data: {
+          projetoId,
+          descricao: input.descricao,
+          ordem: input.ordem ?? 0,
+        },
+      });
     });
   }
 
-  updateChecklistItem(itemId: number, input: UpdateChecklistItemInput) {
-    return this.prisma.projetoChecklistItem.update({
-      where: { id: itemId },
-      data: {
-        ...input,
-        ...(input.concluido !== undefined
-          ? { concluidoEm: input.concluido ? new Date() : null }
-          : {}),
-      },
+  updateChecklistItem(
+    itemId: number,
+    input: UpdateChecklistItemInput,
+    projetoId: number,
+  ) {
+    return this.prisma.withAudit(async (tx) => {
+      await this.lockOpenProject(projetoId, tx);
+      return tx.projetoChecklistItem.update({
+        where: { id: itemId, projetoId },
+        data: {
+          ...input,
+          ...(input.concluido !== undefined
+            ? { concluidoEm: input.concluido ? new Date() : null }
+            : {}),
+        },
+      });
     });
   }
 
-  deleteChecklistItem(itemId: number) {
-    return this.prisma.projetoChecklistItem.delete({ where: { id: itemId } });
+  deleteChecklistItem(itemId: number, projetoId: number) {
+    return this.prisma.withAudit(async (tx) => {
+      await this.lockOpenProject(projetoId, tx);
+      return tx.projetoChecklistItem.delete({
+        where: { id: itemId, projetoId },
+      });
+    });
   }
 
   findChecklistItem(itemId: number, projetoId: number) {
@@ -210,7 +236,7 @@ export class ProjetosRepository {
     usuarioId: number,
     tx?: Prisma.TransactionClient,
   ) {
-    const valorTotal = input.quantidade * input.valorUnitario;
+    const valorTotal = itemTotal(input.quantidade, input.valorUnitario);
     const client = tx ?? this.prisma;
     return client.projetoConsumo.create({
       data: {
@@ -231,11 +257,18 @@ export class ProjetosRepository {
   }
 
   async lockOpenProject(id: number, tx: Prisma.TransactionClient) {
-    const [project] = await tx.$queryRaw<Array<{ status: string; ativo: number | boolean }>>`
-      SELECT status, ativo FROM projetos WHERE id = ${id} FOR UPDATE
+    const [project] = await tx.$queryRaw<
+      Array<{ status: string; ativo: number | boolean }>
+    >`
+      SELECT situacao AS status, ativo FROM projetos WHERE id = ${id} FOR UPDATE
     `;
-    if (!project?.ativo || !['AGUARDANDO', 'EM_ANDAMENTO'].includes(project.status)) {
-      throw new BadRequestException('Não é possível registrar consumo em projeto inativo ou encerrado.');
+    if (
+      !project?.ativo ||
+      !['AGUARDANDO', 'EM_ANDAMENTO'].includes(project.status)
+    ) {
+      throw new BadRequestException(
+        'Não é possível registrar consumo em projeto inativo ou encerrado.',
+      );
     }
   }
 

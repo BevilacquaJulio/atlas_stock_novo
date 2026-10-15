@@ -42,7 +42,9 @@ describe('LoginPage', () => {
 
   it('não oferece credenciais de demonstração', () => {
     renderPage();
-    expect(screen.queryByRole('button', { name: 'Preencher acesso demo' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Preencher acesso demo' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText('E-mail')).toHaveValue('');
     expect(screen.getByLabelText('Senha')).toHaveValue('');
   });
@@ -57,7 +59,11 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
     await waitFor(() =>
-      expect(loginMock).toHaveBeenCalledWith('admin@atlas.com', 'admin123'),
+      expect(loginMock).toHaveBeenCalledWith(
+        'admin@atlas.com',
+        'admin123',
+        undefined,
+      ),
     );
   });
 

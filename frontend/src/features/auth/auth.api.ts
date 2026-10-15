@@ -1,15 +1,19 @@
 import { api, refreshAccessToken } from '../../lib/api';
-import { tokenStore } from '../../lib/token-store';
+import { withSessionLock } from '../../lib/session-lock';
 import type { AuthUser, LoginResponse } from './auth.types';
 
 export async function loginRequest(
   email: string,
   senha: string,
+  codigo?: string,
 ): Promise<LoginResponse> {
-  const { data } = await api.post<LoginResponse>('/auth/login', {
-    email,
-    senha,
-  });
+  const { data } = await withSessionLock(() =>
+    api.post<LoginResponse>('/auth/login', {
+      email,
+      senha,
+      ...(codigo ? { codigo } : {}),
+    }),
+  );
   return data;
 }
 
@@ -24,19 +28,18 @@ export async function fetchMe(): Promise<AuthUser> {
   return data;
 }
 
-export async function logoutRequest(refreshToken = tokenStore.getRefresh()): Promise<void> {
-  if (refreshToken) {
-    await api.post('/auth/logout', { refreshToken }).catch(() => undefined);
-  }
+export async function logoutRequest(): Promise<void> {
+  await withSessionLock(() => api.post('/auth/logout', {}));
 }
 
 /** Confirma a senha do próprio usuário para liberar ações críticas. */
 export async function reautenticarRequest(
   senha: string,
+  codigo?: string,
 ): Promise<{ token: string; expiresIn: number }> {
   const { data } = await api.post<{ token: string; expiresIn: number }>(
     '/auth/reautenticar',
-    { senha },
+    { senha, ...(codigo ? { codigo } : {}) },
   );
   return data;
 }

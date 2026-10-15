@@ -8,6 +8,9 @@ import { FornecedoresRepository } from '../src/modules/fornecedores/fornecedores
 import { ProjetosRepository } from '../src/modules/projetos/projetos.repository';
 import { testDatabase } from './mysql-fixture';
 import { MAX_QUANTITY } from '../src/common/validators/bounds';
+import { VeiculosRepository } from '../src/modules/veiculos/veiculos.repository';
+import { ClientesRepository } from '../src/modules/clientes/clientes.repository';
+import { ProjetosService } from '../src/modules/projetos/projetos.service';
 
 const prisma = testDatabase();
 const movement = new MovimentacoesRepository(prisma);
@@ -363,5 +366,135 @@ describe('estoque e transições em MySQL isolado', () => {
         prisma.$transaction((tx) => projects.lockOpenProject(project.id, tx)),
       ).rejects.toBeInstanceOf(BadRequestException);
     }
+  });
+
+  it('checklist e encerramento concorrentes preservam o estado final e impedem edições posteriores', async () => {
+    const project = await projects.create(
+      { clienteId: clientId, veiculoId: vehicleId, valorOrcado: 0 },
+      userId,
+    );
+    const item = await projects.addChecklistItem(project.id, {
+      descricao: 'Verificação sintética',
+    });
+    await projects.updateChecklistItem(
+      item.id,
+      { concluido: true },
+      project.id,
+    );
+    await projects.updateChecklistItem(
+      item.id,
+      { concluido: false },
+      project.id,
+    );
+    await projects.deleteChecklistItem(item.id, project.id);
+    const first = project.checklist[0];
+    await Promise.allSettled([
+      projects.updateChecklistItem(first.id, { concluido: true }, project.id),
+      projects.updateStatus(project.id, {
+        status: 'CONCLUIDO',
+        statusAnterior: 'AGUARDANDO',
+        observacao: null,
+        usuarioId: userId,
+      }),
+    ]);
+    expect((await projects.findById(project.id))?.status).toBe('CONCLUIDO');
+    await expect(
+      projects.addChecklistItem(project.id, { descricao: 'Indevido' }),
+    ).rejects.toThrow();
+    await expect(
+      projects.updateChecklistItem(first.id, { concluido: false }, project.id),
+    ).rejects.toThrow();
+    await expect(
+      projects.deleteChecklistItem(first.id, project.id),
+    ).rejects.toThrow();
+  });
+
+  it('não troca o cliente de veículo que possui projetos e recusa cliente inativo', async () => {
+    await projects.create(
+      { clienteId: clientId, veiculoId: vehicleId, valorOrcado: 0 },
+      userId,
+    );
+    const other = await prisma.cliente.create({
+      data: { nomeCompleto: `${prefix} outro`, cpfCnpj: '52998224725' },
+    });
+    const vehicles = new VeiculosRepository(prisma);
+    try {
+      await expect(
+        vehicles.update(vehicleId, { cliente: { connect: { id: other.id } } }),
+      ).rejects.toThrow('projetos vinculados');
+      await prisma.cliente.update({
+        where: { id: other.id },
+        data: { ativo: false },
+      });
+      await expect(
+        vehicles.update(vehicleId, { cliente: { connect: { id: other.id } } }),
+      ).rejects.toThrow('inativo');
+      await vehicles.update(vehicleId, {
+        modelo: 'Modelo sintético atualizado',
+      });
+      expect((await vehicles.findById(vehicleId))?.clienteId).toBe(clientId);
+    } finally {
+      await prisma.cliente.delete({ where: { id: other.id } });
+    }
+  });
+
+  it('consumo usa custo lido sob lock mesmo se o produto mudou após a validação inicial', async () => {
+    const p = await product();
+    const project = await projects.create(
+      { clienteId: clientId, veiculoId: vehicleId, valorOrcado: 0 },
+      userId,
+    );
+    const productsRepo = new ProdutosRepository(prisma);
+    const original = productsRepo.findById.bind(productsRepo);
+    const staleProducts = {
+      findById: async (id: number) => {
+        const stale = await original(id);
+        await prisma.produto.update({
+          where: { id },
+          data: { custoMedio: 20 },
+        });
+        return stale;
+      },
+    };
+    const service = new ProjetosService(
+      projects,
+      new ClientesRepository(prisma),
+      new VeiculosRepository(prisma),
+      staleProducts as unknown as ProdutosRepository,
+      movement,
+      prisma,
+    );
+    await service.registrarConsumo(
+      project.id,
+      { tipo: 'PRODUTO', produtoId: p.id, quantidade: 1, valorUnitario: 10 },
+      userId,
+    );
+    const registered = await prisma.movimentacao.findFirstOrThrow({
+      where: { projetoId: project.id, produtoId: p.id },
+    });
+    expect(Number(registered.custoUnitario)).toBe(20);
+    expect((await saldo(p.id)).quantidade).toBe(9);
+    await service.registrarConsumo(
+      project.id,
+      {
+        tipo: 'SERVICO',
+        descricao: 'Serviço sintético',
+        quantidade: 0.5,
+        valorUnitario: 0.01,
+      },
+      userId,
+    );
+    await expect(
+      service.registrarConsumo(
+        project.id,
+        {
+          tipo: 'PRODUTO',
+          produtoId: p.id,
+          quantidade: 1000,
+          valorUnitario: 10,
+        },
+        userId,
+      ),
+    ).rejects.toThrow('Estoque insuficiente');
   });
 });

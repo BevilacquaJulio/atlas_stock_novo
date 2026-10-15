@@ -10,6 +10,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CanceledError } from 'axios';
 import { SESSION_EXPIRED_EVENT } from '../../lib/api';
 import { tokenStore } from '../../lib/token-store';
+import {
+  notifySessionChange,
+  SESSION_CHANGED_EVENT,
+} from '../../lib/session-lock';
 import { reautenticacaoStore } from '../../lib/reautenticacao';
 import { loginRequest, logoutRequest, restoreSession } from './auth.api';
 import type { AuthUser } from './auth.types';
@@ -19,7 +23,7 @@ type Status = 'loading' | 'authenticated' | 'unauthenticated';
 export interface AuthContextValue {
   user: AuthUser | null;
   status: Status;
-  login: (email: string, senha: string) => Promise<void>;
+  login: (email: string, senha: string, codigo?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -45,10 +49,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
     const generation = tokenStore.getGeneration();
     async function bootstrap() {
-      if (!tokenStore.getRefresh()) {
-        setStatus('unauthenticated');
-        return;
-      }
       try {
         const me = await restoreSession();
         if (!active || generation !== tokenStore.getGeneration()) return;
@@ -70,29 +70,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearPrivateState();
     };
     window.addEventListener(SESSION_EXPIRED_EVENT, handler);
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handler);
+    window.addEventListener(SESSION_CHANGED_EVENT, handler);
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handler);
+      window.removeEventListener(SESSION_CHANGED_EVENT, handler);
+    };
   }, [clearPrivateState]);
 
-  const login = useCallback(async (email: string, senha: string) => {
-    const generation = clearPrivateState();
-    setStatus('loading');
-    try {
-      const res = await loginRequest(email, senha);
-      if (generation !== tokenStore.getGeneration()) throw new CanceledError('A sessão mudou.');
-      tokenStore.setAccess(res.accessToken);
-      tokenStore.setRefresh(res.refreshToken);
-      setUser(res.user);
-      setStatus('authenticated');
-    } catch (error) {
-      if (generation === tokenStore.getGeneration()) setStatus('unauthenticated');
-      throw error;
-    }
-  }, [clearPrivateState]);
+  const login = useCallback(
+    async (email: string, senha: string, codigo?: string) => {
+      const generation = clearPrivateState();
+      setStatus('loading');
+      try {
+        const res = await loginRequest(email, senha, codigo);
+        if (generation !== tokenStore.getGeneration())
+          throw new CanceledError('A sessão mudou.');
+        tokenStore.setAccess(res.accessToken);
+        notifySessionChange();
+        setUser(res.user);
+        setStatus('authenticated');
+      } catch (error) {
+        if (generation === tokenStore.getGeneration())
+          setStatus('unauthenticated');
+        throw error;
+      }
+    },
+    [clearPrivateState],
+  );
 
   const logout = useCallback(async () => {
-    const refreshToken = tokenStore.getRefresh();
     clearPrivateState();
-    await logoutRequest(refreshToken);
+    try {
+      await logoutRequest();
+    } finally {
+      notifySessionChange();
+    }
   }, [clearPrivateState]);
 
   const value = useMemo<AuthContextValue>(

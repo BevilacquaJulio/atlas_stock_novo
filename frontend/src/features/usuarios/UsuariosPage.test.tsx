@@ -11,12 +11,19 @@ import {
 } from './usuarios.api';
 import type { Cargo } from '../auth/auth.types';
 import type { Usuario } from './usuarios.types';
+import { api } from '../../lib/api';
 
 let cargo: Cargo = 'ADMINISTRADOR';
 
 vi.mock('../auth/useAuth', () => ({
   useAuth: () => ({
-    user: { id: 1, nome: 'Admin', email: 'a@example.test', cargo, acessoFinanceiro: true },
+    user: {
+      id: 1,
+      nome: 'Admin',
+      email: 'a@example.test',
+      cargo,
+      acessoFinanceiro: true,
+    },
   }),
 }));
 
@@ -40,9 +47,21 @@ const linha = (over: Partial<Usuario>): Usuario => ({
 
 const usuarios = [
   linha({}),
-  linha({ id: 2, nome: 'Bia', email: 'gf@example.test', cargo: 'GERENTE', acessoFinanceiro: true }),
+  linha({
+    id: 2,
+    nome: 'Bia',
+    email: 'gf@example.test',
+    cargo: 'GERENTE',
+    acessoFinanceiro: true,
+  }),
   linha({ id: 3, nome: 'Caio', email: 'g@example.test', cargo: 'GERENTE' }),
-  linha({ id: 4, nome: 'Duda', email: 'o@example.test', cargo: 'OPERADOR', ativo: false }),
+  linha({
+    id: 4,
+    nome: 'Duda',
+    email: 'o@example.test',
+    cargo: 'OPERADOR',
+    ativo: false,
+  }),
 ];
 
 function renderPage() {
@@ -57,7 +76,9 @@ function renderPage() {
 }
 
 async function escolherCargo(dialog: HTMLElement, nome: string) {
-  await userEvent.click(within(dialog).getByRole('combobox', { name: 'Cargo' }));
+  await userEvent.click(
+    within(dialog).getByRole('combobox', { name: 'Cargo' }),
+  );
   await userEvent.click(await screen.findByRole('option', { name: nome }));
 }
 
@@ -99,19 +120,62 @@ describe('UsuariosPage', () => {
     expect(within(linhaDe('Duda')).getByText('Operador')).toBeInTheDocument();
   });
 
+  it('gera link de uso único para o titular e permite ocultá-lo', async () => {
+    const original = api.defaults.adapter;
+    api.defaults.adapter = async (config) => ({
+      config,
+      data: { token: 'synthetic-recovery-token', expiresIn: 900 },
+      status: 201,
+      statusText: 'Created',
+      headers: new AxiosHeaders(),
+    });
+    try {
+      renderPage();
+      const row = (await screen.findByText('Bia')).closest('tr')!;
+      await userEvent.click(
+        within(row).getByRole('button', { name: 'Gerar recuperação' }),
+      );
+      expect(
+        await screen.findByRole('textbox', { name: 'Link de recuperação' }),
+      ).toHaveValue(
+        `${window.location.origin}/recuperar#synthetic-recovery-token`,
+      );
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Ocultar link' }),
+      );
+      expect(
+        screen.queryByRole('textbox', { name: 'Link de recuperação' }),
+      ).not.toBeInTheDocument();
+    } finally {
+      api.defaults.adapter = original;
+    }
+  });
+
   it('cria gerente com acesso financeiro', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole('button', { name: /Novo usuário/ }));
+    await user.click(
+      await screen.findByRole('button', { name: /Novo usuário/ }),
+    );
     const dialog = await screen.findByRole('dialog');
 
     await user.type(within(dialog).getByLabelText('Nome'), 'Nova Gerente');
-    await user.type(within(dialog).getByLabelText('E-mail'), 'nova@example.test');
-    await user.type(within(dialog).getByLabelText('Senha inicial'), 'senha-forte-de-teste');
+    await user.type(
+      within(dialog).getByLabelText('E-mail'),
+      'nova@example.test',
+    );
+    await user.type(
+      within(dialog).getByLabelText('Senha inicial'),
+      'senha-forte-de-teste',
+    );
     // Operador não tem a opção de financeiro.
-    expect(within(dialog).queryAllByLabelText('Acesso ao financeiro')).toHaveLength(0);
+    expect(
+      within(dialog).queryAllByLabelText('Acesso ao financeiro'),
+    ).toHaveLength(0);
     await escolherCargo(dialog, 'Gerente');
-    await user.click(within(dialog).getAllByLabelText('Acesso ao financeiro')[0]);
+    await user.click(
+      within(dialog).getAllByLabelText('Acesso ao financeiro')[0],
+    );
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() =>
@@ -128,21 +192,27 @@ describe('UsuariosPage', () => {
   it('valida a senha inicial antes de enviar', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole('button', { name: /Novo usuário/ }));
+    await user.click(
+      await screen.findByRole('button', { name: /Novo usuário/ }),
+    );
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText('Nome'), 'Pessoa');
     await user.type(within(dialog).getByLabelText('E-mail'), 'p@example.test');
     await user.type(within(dialog).getByLabelText('Senha inicial'), 'curta');
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
-    expect(await within(dialog).findByText('Mínimo de 12 caracteres.')).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText('Mínimo de 12 caracteres.'),
+    ).toBeInTheDocument();
     expect(createUsuario).not.toHaveBeenCalled();
   });
 
   it('rebaixar gerente para operador retira o acesso financeiro', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole('button', { name: 'Editar acesso de Bia' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Editar acesso de Bia' }),
+    );
     const dialog = await screen.findByRole('dialog');
 
     await escolherCargo(dialog, 'Operador');
@@ -163,14 +233,18 @@ describe('UsuariosPage', () => {
       erroDaApi('Não é possível remover o último administrador ativo.'),
     );
     renderPage();
-    await user.click(await screen.findByRole('button', { name: 'Editar acesso de Admin' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Editar acesso de Admin' }),
+    );
     const dialog = await screen.findByRole('dialog');
 
     await user.click(within(dialog).getAllByLabelText('Ativo')[0]);
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect(
-      await within(dialog).findByText('Não é possível remover o último administrador ativo.'),
+      await within(dialog).findByText(
+        'Não é possível remover o último administrador ativo.',
+      ),
     ).toBeInTheDocument();
     expect(updateAcessoUsuario).toHaveBeenCalledWith(1, {
       cargo: 'ADMINISTRADOR',

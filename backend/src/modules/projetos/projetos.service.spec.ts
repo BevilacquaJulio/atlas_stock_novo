@@ -27,7 +27,7 @@ const makeVeiculosRepo = () => ({ findById: vi.fn() });
 const makeProdutosRepo = () => ({ findById: vi.fn() });
 const makeMovimentacoesRepo = () => ({ registrar: vi.fn() });
 const makePrisma = () => ({
-  $transaction: vi.fn((fn: (tx: unknown) => unknown) => fn({})),
+  withAudit: vi.fn((fn: (tx: unknown) => unknown) => fn({})),
 });
 
 describe('ProjetosService', () => {
@@ -106,16 +106,41 @@ describe('ProjetosService', () => {
   });
 
   it('rejeita consumo em projeto concluído antes de alterar estoque', async () => {
-    projetosRepo.findById.mockResolvedValue({ id: 1, ativo: true, status: 'CONCLUIDO' });
-    await expect(service.registrarConsumo(1, { tipo: 'PRODUTO', produtoId: 2, quantidade: 1, valorUnitario: 10 }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    projetosRepo.findById.mockResolvedValue({
+      id: 1,
+      ativo: true,
+      status: 'CONCLUIDO',
+    });
+    await expect(
+      service.registrarConsumo(
+        1,
+        { tipo: 'PRODUTO', produtoId: 2, quantidade: 1, valorUnitario: 10 },
+        1,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(produtosRepo.findById).not.toHaveBeenCalled();
     expect(projetosRepo.createConsumo).not.toHaveBeenCalled();
   });
 
   it('rejeita produto vinculado a outro projeto sem registrar consumo', async () => {
-    projetosRepo.findById.mockResolvedValue({ id: 1, ativo: true, status: 'EM_ANDAMENTO' });
-    produtosRepo.findById.mockResolvedValue({ id: 2, ativo: true, escopo: 'PROJETO', projetoId: 99 });
-    await expect(service.registrarConsumo(1, { tipo: 'PRODUTO', produtoId: 2, quantidade: 1, valorUnitario: 10 }, 1)).rejects.toBeInstanceOf(BadRequestException);
+    projetosRepo.findById.mockResolvedValue({
+      id: 1,
+      ativo: true,
+      status: 'EM_ANDAMENTO',
+    });
+    produtosRepo.findById.mockResolvedValue({
+      id: 2,
+      ativo: true,
+      escopo: 'PROJETO',
+      projetoId: 99,
+    });
+    await expect(
+      service.registrarConsumo(
+        1,
+        { tipo: 'PRODUTO', produtoId: 2, quantidade: 1, valorUnitario: 10 },
+        1,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(projetosRepo.createConsumo).not.toHaveBeenCalled();
   });
 });

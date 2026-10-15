@@ -81,11 +81,7 @@ export class ComprasService {
       }
     }
 
-    return this.repo.createCompra(
-      input,
-      usuarioId,
-      fornecedor.nomeRazaoSocial,
-    );
+    return this.repo.createCompra(input, usuarioId, fornecedor.nomeRazaoSocial);
   }
 
   /** A_PAGAR → PAGO: registra pagamento da nota (sem entrada no estoque). */
@@ -104,8 +100,11 @@ export class ComprasService {
 
     const dataPagamento = input.dataPagamento ?? new Date();
 
-    return this.prisma.$transaction(async (tx) => {
-      await this.repo.transition(tx, id, 'A_PAGAR', { status: 'PAGO', dataPagamento });
+    return this.prisma.withAudit(async (tx) => {
+      await this.repo.transition(tx, id, 'A_PAGAR', {
+        status: 'PAGO',
+        dataPagamento,
+      });
       await tx.despesa.update({
         where: { compraId: id },
         data: { status: 'PAGO', dataPagamento },
@@ -131,9 +130,11 @@ export class ComprasService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.withAudit(async (tx) => {
       await this.repo.transition(tx, id, 'PAGO', { status: 'CONFIRMADA' });
-      for (const item of [...compra.itens].sort((a, b) => a.produtoId - b.produtoId)) {
+      for (const item of [...compra.itens].sort(
+        (a, b) => a.produtoId - b.produtoId,
+      )) {
         await this.registrarMovimentacao(
           {
             produtoId: item.produtoId,
@@ -165,9 +166,11 @@ export class ComprasService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.withAudit(async (tx) => {
       await this.repo.transition(tx, id, 'CONFIRMADA', { status: 'PAGO' });
-      for (const item of [...compra.itens].sort((a, b) => a.produtoId - b.produtoId)) {
+      for (const item of [...compra.itens].sort(
+        (a, b) => a.produtoId - b.produtoId,
+      )) {
         await this.registrarMovimentacao(
           {
             produtoId: item.produtoId,
@@ -205,8 +208,11 @@ export class ComprasService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      await this.repo.transition(tx, id, 'PAGO', { status: 'A_PAGAR', dataPagamento: null });
+    return this.prisma.withAudit(async (tx) => {
+      await this.repo.transition(tx, id, 'PAGO', {
+        status: 'A_PAGAR',
+        dataPagamento: null,
+      });
       await tx.despesa.update({
         where: { compraId: id },
         data: { status: 'A_PAGAR', dataPagamento: null },

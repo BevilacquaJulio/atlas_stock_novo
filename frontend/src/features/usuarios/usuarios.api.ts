@@ -5,8 +5,10 @@ import type {
   Usuario,
 } from './usuarios.types';
 
-export async function listUsuarios(): Promise<Usuario[]> {
-  const { data } = await api.get<Usuario[]>('/usuarios');
+export async function listUsuarios(
+  params: { page?: number; limit?: number; search?: string } = {},
+): Promise<Usuario[]> {
+  const { data } = await api.get<Usuario[]>('/usuarios', { params });
   return data;
 }
 

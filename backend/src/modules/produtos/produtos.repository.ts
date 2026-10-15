@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { itemTotal } from '../../common/money';
 import type { Prisma } from '../../../generated/prisma/client';
 
 @Injectable()
@@ -42,7 +43,7 @@ export class ProdutosRepository {
     valorUnitario: number,
     usuarioId: number,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.withAudit(async (tx) => {
       const produto = await tx.produto.create({ data });
       if (estoqueInicial > 0) {
         await tx.movimentacao.create({
@@ -51,7 +52,7 @@ export class ProdutosRepository {
             tipo: 'ENTRADA',
             quantidade: estoqueInicial,
             custoUnitario: valorUnitario,
-            valorTotal: estoqueInicial * valorUnitario,
+            valorTotal: itemTotal(estoqueInicial, valorUnitario),
             motivo: 'Estoque inicial',
             usuarioId,
           },

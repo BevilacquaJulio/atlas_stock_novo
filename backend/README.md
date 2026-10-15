@@ -8,7 +8,7 @@ para uma arquitetura **NestJS + Prisma 7 + MySQL**, tipada e testada.
 - **NestJS 11** (arquitetura modular: controller → service → repository)
 - **Prisma 7** com driver adapter `@prisma/adapter-mariadb` + **MySQL**
 - **Zod** via `nestjs-zod` (validação global de toda entrada)
-- **JWT** access + refresh (rotação e revogação) + `bcryptjs`
+- **JWT** access vinculado à sessão + refresh opaco em cookie HttpOnly; Argon2id com migração de bcrypt no login.
 - **helmet**, CORS travado por env, rate limiting (`@nestjs/throttler`)
 - **pino** (logs estruturados), **Swagger** em `/api/docs`
 - **Vitest** para testes
@@ -26,10 +26,10 @@ formato padrão `{ error: { code, message } }` (filtro global de exceções).
 
 1. **Instalar dependências**
    ```bash
-   npm install
+   npm ci
    ```
 2. **Configurar ambiente** — copie `.env.example` para `.env` e ajuste as
-   variáveis `MYSQL_*`, `JWT_*` e `CORS_ORIGIN`:
+   variáveis `MYSQL_*`, `JWT_ACCESS_SECRET`, `MFA_ENCRYPTION_KEY` e `CORS_ORIGIN`:
    ```bash
    cp .env.example .env
    ```
@@ -49,7 +49,7 @@ formato padrão `{ error: { code, message } }` (filtro global de exceções).
    ```bash
    npm run db:populate
    ```
-   Para repopular do zero: `POPULATE_RESET=1 npm run db:populate`
+   Somente em banco exclusivo de demonstração com `ALLOW_DEMO_POPULATE=true`. Não use limpeza/populate em produção.
 7. **Subir a API**
    ```bash
    npm run start:dev
@@ -65,7 +65,7 @@ formato padrão `{ error: { code, message } }` (filtro global de exceções).
 
 O schema evolui em `prisma/schema.prisma`. A cada fase, o agente edita o schema
 e **gera** os arquivos de migration; **você** aplica com `prisma migrate deploy`
-— o agente nunca conecta no seu banco.
+— aplicação em ambiente real exige autorização específica. Testes usam apenas MySQL descartável com guardas de destino.
 
 A migration inicial (`20260717120000_init`) cobre a **Fase 1**: autenticação +
 cadastros (usuários, categorias, produtos, fornecedores, clientes, veículos,
@@ -73,21 +73,23 @@ movimentações de estoque).
 
 ## Escopo por fase
 
-| Fase | Módulos | Status |
-|------|---------|--------|
-| 1 | Auth (JWT) + Cadastros + Estoque | ✅ implementado |
-| 2 | Compras (+ despesa vinculada) | ✅ implementado |
-| 3 | Projetos + Checklist + Consumo | ✅ implementado |
-| 4 | Financeiro + Dashboard | ✅ implementado |
+| Fase | Módulos                          | Status          |
+| ---- | -------------------------------- | --------------- |
+| 1    | Auth (JWT) + Cadastros + Estoque | ✅ implementado |
+| 2    | Compras (+ despesa vinculada)    | ✅ implementado |
+| 3    | Projetos + Checklist + Consumo   | ✅ implementado |
+| 4    | Financeiro + Dashboard           | ✅ implementado |
 
 ## Testes
 
 ```bash
 npm test          # unit (Vitest)
-npm run test:cov  # cobertura
+npm run test:cov  # unitários + MySQL isolado; veja ../docs/validacao.md
 ```
 
 ## Decisões
+
+Leia [operação e transição de schema](../docs/operacao.md) antes de atualizar uma instalação. Cookies, CSRF, recuperação pelo administrador, MFA e duas abas fazem parte do contrato atual; [inventário de endpoints](../docs/inventario-endpoints.md).
 
 - **Segredos só em env** — nada de credencial no código (o legado tinha a senha
   do banco hardcoded em `config/database.php`; aqui vai para `.env`).

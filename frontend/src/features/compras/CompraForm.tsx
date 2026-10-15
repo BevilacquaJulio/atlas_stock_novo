@@ -1,15 +1,13 @@
+import { RemoteSelectField } from '../../components/form/RemoteSelectField';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
 import { TextField } from '../../components/form/TextField';
-import { SelectField } from '../../components/form/SelectField';
 import { TextareaField } from '../../components/form/TextareaField';
 import { Button } from '../../components/Button';
 import { Alert } from '../../components/feedback';
+import { totalCompra } from '../../lib/money';
 import { IconPlus, IconTrash } from '../../components/icons';
-import { listFornecedores } from '../fornecedores/fornecedores.api';
-import { listProdutos } from '../produtos/produtos.api';
 import type { CompraFormValues } from './compras.types';
 
 const itemSchema = z.object({
@@ -36,16 +34,6 @@ export function CompraForm({
   onSubmit: (values: CompraFormValues) => void;
   error?: string | null;
 }) {
-  const fornecedoresQuery = useQuery({
-    queryKey: ['fornecedores', 'options'],
-    queryFn: () => listFornecedores({ limit: 100, ativo: true }),
-  });
-
-  const produtosQuery = useQuery({
-    queryKey: ['produtos', 'options'],
-    queryFn: () => listProdutos({ limit: 100, ativo: true }),
-  });
-
   const {
     register,
     control,
@@ -55,28 +43,15 @@ export function CompraForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      itens: [{ quantidade: 1, valorUnitario: 0 } as FormValues['itens'][number]],
+      itens: [
+        { quantidade: 1, valorUnitario: 0 } as FormValues['itens'][number],
+      ],
     },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'itens' });
   const itens = watch('itens');
-  const total = itens.reduce(
-    (sum, item) => sum + (item.quantidade || 0) * (item.valorUnitario || 0),
-    0,
-  );
-
-  const fornecedorOptions =
-    fornecedoresQuery.data?.data.map((f) => ({
-      value: f.id,
-      label: f.nomeRazaoSocial,
-    })) ?? [];
-
-  const produtoOptions =
-    produtosQuery.data?.data.map((p) => ({
-      value: p.id,
-      label: `${p.codigo} — ${p.nome}`,
-    })) ?? [];
+  const total = totalCompra(itens);
 
   return (
     <form
@@ -86,13 +61,11 @@ export function CompraForm({
     >
       {error && <Alert kind="error">{error}</Alert>}
 
-      <SelectField
+      <RemoteSelectField
         label="Fornecedor"
-        placeholder={
-          fornecedoresQuery.isLoading ? 'Carregando…' : 'Selecione o fornecedor'
-        }
+        placeholder="Selecione"
         error={errors.fornecedorId?.message}
-        options={fornecedorOptions}
+        source="fornecedores"
         {...register('fornecedorId')}
       />
 
@@ -117,7 +90,10 @@ export function CompraForm({
             type="button"
             variant="secondary"
             onClick={() =>
-              append({ quantidade: 1, valorUnitario: 0 } as FormValues['itens'][number])
+              append({
+                quantidade: 1,
+                valorUnitario: 0,
+              } as FormValues['itens'][number])
             }
           >
             <IconPlus width={16} height={16} />
@@ -153,11 +129,11 @@ export function CompraForm({
                 )}
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
-                <SelectField
+                <RemoteSelectField
                   label="Produto"
                   placeholder="Selecione"
                   error={errors.itens?.[index]?.produtoId?.message}
-                  options={produtoOptions}
+                  source="produtos"
                   {...register(`itens.${index}.produtoId`)}
                 />
                 <TextField

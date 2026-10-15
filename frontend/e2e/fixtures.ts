@@ -13,6 +13,11 @@ const { PrismaService } = backendRequire(
 const { hash } = backendRequire('bcryptjs') as {
   hash: (value: string, rounds: number) => Promise<string>;
 };
+const { totp } = backendRequire('./dist/src/common/auth/totp.js') as {
+  totp: (secret: string, step: number) => string;
+};
+export const mfaCode = (secret: string) =>
+  totp(secret, Math.floor(Date.now() / 30000));
 const { JwtService } = backendRequire('@nestjs/jwt') as {
   JwtService: new () => {
     signAsync: (payload: object, options: object) => Promise<string>;
@@ -20,6 +25,7 @@ const { JwtService } = backendRequire('@nestjs/jwt') as {
 };
 
 export interface Scenario {
+  seedClients: () => Promise<string>;
   prefix: string;
   adminEmail: string;
   operatorEmail: string;
@@ -48,11 +54,13 @@ export async function login(
 }
 
 export const test = base.extend<{ scenario: Scenario }>({
-  scenario: async ({ request }, provide) => {
+  scenario: async ({ request, context }, provide) => {
     assertTestEnvironment();
     const secret = process.env.JWT_ACCESS_SECRET;
     const prisma = new PrismaService();
     const prefix = `e2e-${randomUUID()}`;
+    const address = `192.0.2.${Math.floor(Math.random() * 250) + 1}`;
+    await context.setExtraHTTPHeaders({ 'X-Forwarded-For': address });
     const password = 'synthetic-e2e-password-only';
     const users: number[] = [];
     let categoryId: number | undefined;
@@ -129,9 +137,17 @@ export const test = base.extend<{ scenario: Scenario }>({
         },
       });
       productId = product.id;
+      const session = await prisma.sessao.create({
+        data: {
+          id: randomUUID(),
+          usuarioId: admin.id,
+          expiraEm: new Date(Date.now() + 3600000),
+        },
+      });
       const token = await new JwtService().signAsync(
         {
           purpose: 'access',
+          sid: session.id,
           sub: admin.id,
           email: admin.email,
           cargo: admin.cargo,
@@ -146,6 +162,15 @@ export const test = base.extend<{ scenario: Scenario }>({
         },
       );
       await provide({
+        seedClients: async () => {
+          await prisma.cliente.createMany({
+            data: Array.from({ length: 126 }, (_, index) => ({
+              nomeCompleto: `${prefix} cliente ${String(index + 1).padStart(3, '0')}`,
+              cpfCnpj: '52998224725',
+            })),
+          });
+          return `${prefix} cliente 126`;
+        },
         prefix,
         adminEmail: admin.email,
         operatorEmail: operator.email,

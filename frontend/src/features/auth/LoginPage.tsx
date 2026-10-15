@@ -14,6 +14,7 @@ import { BrandLogo } from '../../components/BrandLogo';
 const loginSchema = z.object({
   email: z.string().email('E-mail inválido.'),
   senha: z.string().min(1, 'Informe a senha.'),
+  codigo: z.string().optional(),
 });
 type LoginForm = z.infer<typeof loginSchema>;
 
@@ -34,7 +35,7 @@ export default function LoginPage() {
   const onSubmit = async (values: LoginForm) => {
     setApiError(null);
     try {
-      await login(values.email, values.senha);
+      await login(values.email, values.senha, values.codigo || undefined);
       navigate('/', { replace: true });
     } catch (err) {
       setApiError(getApiErrorMessage(err, 'Não foi possível entrar.'));
@@ -101,6 +102,11 @@ export default function LoginPage() {
             autoComplete="current-password"
             error={errors.senha?.message}
             {...register('senha')}
+          />
+          <TextField
+            label="Código MFA (se ativado)"
+            autoComplete="one-time-code"
+            {...register('codigo')}
           />
           <Button type="submit" loading={isSubmitting} className="mt-2 w-full">
             Entrar

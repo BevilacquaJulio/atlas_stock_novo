@@ -7,6 +7,8 @@ import {
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { PrismaClient } from '../../generated/prisma/client';
 import { buildDatabaseConfig } from '../config/database-url';
+import { auditContext } from '../common/audit-context';
+import type { Prisma } from '../../generated/prisma/client';
 
 /**
  * PrismaService — instancia o PrismaClient com o driver adapter mariadb
@@ -30,5 +32,25 @@ export class PrismaService
 
   async onModuleDestroy(): Promise<void> {
     await this.$disconnect();
+  }
+
+  withAudit<T>(run: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return this.$transaction(async (tx) => {
+      const result = await run(tx);
+      const req = auditContext.getStore();
+      if (req && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+        // O evento COMMIT pertence à mesma transação; o middleware registra o HTTP final.
+        await tx.eventoAuditoria.create({
+          data: {
+            usuarioId: req.user?.id ?? null,
+            acao: `${req.method}:COMMIT`,
+            recurso: req.path.slice(0, 200),
+            resultado: 0,
+            requestId: String(req.id ?? '').slice(0, 36),
+          },
+        });
+      }
+      return result;
+    });
   }
 }

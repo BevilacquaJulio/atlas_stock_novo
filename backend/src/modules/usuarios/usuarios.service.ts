@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
+import { hashPassword } from '../../common/auth/password';
 import { UsuariosRepository } from './usuarios.repository';
 import {
   MENSAGEM_ACESSO_FINANCEIRO,
@@ -12,14 +12,12 @@ import {
   type UpdateAcessoUsuarioInput,
 } from './dto/create-usuario.dto';
 
-const BCRYPT_COST = 10;
-
 @Injectable()
 export class UsuariosService {
   constructor(private readonly repo: UsuariosRepository) {}
 
-  list() {
-    return this.repo.list();
+  list(query?: { page?: number; limit?: number; search?: string }) {
+    return this.repo.list(query);
   }
 
   async create(data: CreateUsuarioInput) {
@@ -27,7 +25,7 @@ export class UsuariosService {
     if (existing) {
       throw new ConflictException('Já existe um usuário com este e-mail.');
     }
-    const senhaHash = await bcrypt.hash(data.senha, BCRYPT_COST);
+    const senhaHash = await hashPassword(data.senha);
     return this.repo.create({ ...data, senha: senhaHash });
   }
 
@@ -66,7 +64,18 @@ export class UsuariosService {
         );
       }
 
-      return this.repo.update(id, { cargo, ativo, acessoFinanceiro }, tx);
+      const updated = await this.repo.update(
+        id,
+        { cargo, ativo, acessoFinanceiro },
+        tx,
+      );
+      if (
+        cargo !== atual.cargo ||
+        ativo !== atual.ativo ||
+        acessoFinanceiro !== atual.acessoFinanceiro
+      )
+        await this.repo.revogarSessoes(id, tx);
+      return updated;
     });
   }
 }

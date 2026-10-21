@@ -1,8 +1,13 @@
 export const demoAccount = {
   email: 'demo@atlas.com',
-  password: 'AtlasDemo2026!',
+  get password() {
+    return import.meta.env.VITE_DEMO_PASSWORD ?? '';
+  },
 } as const;
 
 export function isDemoEnabled() {
-  return import.meta.env.VITE_DEMO_MODE === 'true';
+  return (
+    import.meta.env.VITE_DEMO_MODE === 'true' &&
+    demoAccount.password.length >= 12
+  );
 }

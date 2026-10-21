@@ -49,7 +49,7 @@ Abra `http://localhost:5173`. O frontend usa `/api` e o proxy Vite encaminha par
 - Novas senhas usam Argon2id. O login de conta bcrypt existente atualiza o hash após validar a senha, sem exigir troca imediata.
 - Refresh opaco em cookie HttpOnly; access JWT em memória. Web Locks coordena as abas. Use HTTPS em produção; HTTP somente em localhost/`.localhost` para desenvolvimento.
 - MFA foi removido dos fluxos e da API. As colunas históricas permanecem sem uso, sem migration destrutiva.
-- A conta de demonstração é opcional e possui perfil Operador, sem acesso financeiro ou administrativo. Para uma instalação de demonstração, execute `npm run db:seed:demo` em `backend` e habilite `VITE_DEMO_MODE=true` antes do build do frontend. O padrão é `false`; detalhes em [operação](docs/operacao.md#conta-de-demonstração-local).
+- A conta de demonstração é opcional e possui perfil Operador, sem acesso financeiro ou administrativo. Configure uma credencial pública exclusiva em `SEED_DEMO_PASSWORD` no backend e `VITE_DEMO_PASSWORD` no frontend; execute `npm run db:seed:demo` em `backend` e habilite `VITE_DEMO_MODE=true` antes do build. O padrão é `false`; detalhes em [operação](docs/operacao.md#conta-de-demonstração-local).
 
 ## Verificação
 

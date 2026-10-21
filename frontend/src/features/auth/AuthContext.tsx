@@ -99,10 +99,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    clearPrivateState();
+    const generation = clearPrivateState();
+    // Aguarda limpar o cookie antes de oferecer login ou recarga da sessão.
+    setStatus('loading');
     try {
       await logoutRequest();
     } finally {
+      if (generation === tokenStore.getGeneration())
+        setStatus('unauthenticated');
       notifySessionChange();
     }
   }, [clearPrivateState]);

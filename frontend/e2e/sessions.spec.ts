@@ -1,5 +1,35 @@
 import { test, expect, login } from './fixtures';
 
+test('aguarda a limpeza do cookie antes de permitir login de outra conta', async ({
+  page,
+  scenario,
+}) => {
+  await login(page, scenario.managerEmail, scenario.password);
+  let releaseLogout!: () => void;
+  const pendingLogout = new Promise<void>((resolve) => {
+    releaseLogout = resolve;
+  });
+  await page.route('**/api/auth/logout', async (route) => {
+    await pendingLogout;
+    await route.continue();
+  });
+  const logoutResponse = page.waitForResponse((response) =>
+    response.url().endsWith('/api/auth/logout'),
+  );
+  await page.getByRole('button', { name: 'Sair da conta' }).first().click();
+  try {
+    await expect(page.getByRole('status')).toHaveText('Verificando sessão…');
+    await expect(page.getByLabel('E-mail', { exact: true })).not.toBeVisible();
+  } finally {
+    releaseLogout();
+  }
+  expect((await logoutResponse).ok()).toBe(true);
+  await expect(page).toHaveURL(/\/login$/);
+  await login(page, scenario.operatorEmail, scenario.password);
+  await page.goto('/financeiro');
+  await expect(page.getByText('Sem acesso ao financeiro')).toBeVisible();
+});
+
 test('seletor encontra cliente fora dos primeiros 100 e preserva na edição', async ({
   page,
   scenario,

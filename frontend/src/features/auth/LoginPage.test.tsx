@@ -11,6 +11,7 @@ vi.mock('./useAuth', () => ({
 beforeEach(() => {
   login.mockReset();
   vi.stubEnv('VITE_DEMO_MODE', 'true');
+  vi.stubEnv('VITE_DEMO_PASSWORD', 'synthetic-demo-password');
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -95,6 +96,17 @@ describe('login sem MFA e conta de demonstração', () => {
   });
   it('não oferece credenciais demo quando a demonstração está desabilitada no build', () => {
     vi.stubEnv('VITE_DEMO_MODE', 'false');
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Preencher conta de demonstração' }),
+    ).not.toBeInTheDocument();
+  });
+  it('não oferece conta demo sem senha configurada', () => {
+    vi.stubEnv('VITE_DEMO_PASSWORD', '');
     render(
       <MemoryRouter>
         <LoginPage />

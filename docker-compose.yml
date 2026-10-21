@@ -60,6 +60,7 @@ services:
         # VITE_* e compilado no build (build-time). Aponta para a API publica.
         VITE_API_URL: https://api.${DOMAIN}/api
         VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
+        VITE_DEMO_PASSWORD: ${VITE_DEMO_PASSWORD:-}
     container_name: bl_g5-app
     restart: unless-stopped
     init: true
@@ -110,6 +111,7 @@ services:
       MYSQL_SSL_CA_PATH: ${MYSQL_SSL_CA_PATH:-/run/secrets/mysql-ca.pem}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_DEMO_PASSWORD: ${VITE_DEMO_PASSWORD:-}
     profiles:
       - tools
     volumes:

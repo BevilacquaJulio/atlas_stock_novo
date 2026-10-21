@@ -1,12 +1,20 @@
 import type { PrismaClient } from '../../../generated/prisma/client';
 import { hashPassword, verifyPassword } from './password';
+import { newPasswordSchema } from '../validators/bounds';
 
 export const demoAccount = {
   email: 'demo@atlas.com',
-  password: 'AtlasDemo2026!',
 } as const;
 
-export async function seedDemoAccount(prisma: Pick<PrismaClient, 'usuario'>) {
+export async function seedDemoAccount(
+  prisma: Pick<PrismaClient, 'usuario'>,
+  configuredPassword = process.env.SEED_DEMO_PASSWORD,
+) {
+  const parsed = newPasswordSchema.safeParse(configuredPassword);
+  if (!parsed.success) {
+    throw new Error('Configure SEED_DEMO_PASSWORD com uma senha demo válida.');
+  }
+  const password = parsed.data;
   const existing = await prisma.usuario.findUnique({
     where: { email: demoAccount.email },
   });
@@ -15,7 +23,7 @@ export async function seedDemoAccount(prisma: Pick<PrismaClient, 'usuario'>) {
       existing.cargo !== 'OPERADOR' ||
       existing.acessoFinanceiro ||
       !existing.ativo ||
-      !(await verifyPassword(existing.senha, demoAccount.password))
+      !(await verifyPassword(existing.senha, password))
     ) {
       throw new Error(
         'O e-mail de demonstração já pertence a uma conta incompatível. Nenhuma conta foi alterada.',
@@ -27,7 +35,7 @@ export async function seedDemoAccount(prisma: Pick<PrismaClient, 'usuario'>) {
     data: {
       nome: 'Demonstração',
       email: demoAccount.email,
-      senha: await hashPassword(demoAccount.password),
+      senha: await hashPassword(password),
       cargo: 'OPERADOR',
       acessoFinanceiro: false,
       ativo: true,

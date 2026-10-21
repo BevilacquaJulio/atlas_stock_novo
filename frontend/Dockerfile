@@ -5,12 +5,14 @@ ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 ARG VITE_DEMO_MODE=false
 ENV VITE_DEMO_MODE=$VITE_DEMO_MODE
+ARG VITE_DEMO_PASSWORD
+ENV VITE_DEMO_PASSWORD=$VITE_DEMO_PASSWORD
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build && node prepare-headers.cjs
 
-FROM nginxinc/nginx-unprivileged:stable-alpine@sha256:782bb89768cc87b7f95c18b95baa1af250e5d451f26794f59363540161147c01 AS runtime
+FROM nginxinc/nginx-unprivileged:stable-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03 AS runtime
 ARG NGINX_CONFIG=nginx.conf
 COPY ${NGINX_CONFIG} /etc/nginx/conf.d/default.conf
 COPY --from=build /app/security-headers.conf /etc/nginx/security-headers.conf

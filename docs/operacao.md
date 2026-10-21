@@ -114,7 +114,7 @@ O cliente envia `Idempotency-Key` em criações. Compras, movimentações, recei
 
 ### Conta de demonstração local
 
-O Compose local compila o frontend com `VITE_DEMO_MODE=true`. O botão do login preenche `demo@atlas.com` e a senha pública `AtlasDemo2026!`, sem entrar automaticamente. A conta tem cargo Operador e não possui acesso financeiro nem administração de usuários. Ela possui as permissões operacionais normais desse cargo sobre os dados desta instalação; use uma instalação de demonstração.
+O Compose local habilita o modo de demonstração. Configure `VITE_DEMO_PASSWORD` no `.env` da raiz com uma credencial pública exclusiva desta instalação, com pelo menos 12 caracteres; nunca reutilize senha privada ou administrativa. O botão preenche `demo@atlas.com` e essa credencial, sem entrar automaticamente. Sem senha configurada, o botão fica oculto. A conta tem cargo Operador e não possui acesso financeiro nem administração de usuários. Ela possui as permissões operacionais normais desse cargo sobre os dados desta instalação; use uma instalação de demonstração.
 
 Após as migrations, crie a conta com a ferramenta manual (PowerShell na raiz):
 
@@ -124,4 +124,4 @@ docker compose run --rm --no-deps migrate npm run db:seed:demo
 docker compose -f docker-compose.local.yml up -d --build
 ```
 
-O seed demo não depende da senha do administrador, não altera contas existentes incompatíveis e pode ser repetido para a mesma conta demo. Em produção, `VITE_DEMO_MODE` permanece `false` por padrão; habilite-o somente em uma instalação destinada à demonstração. MFA foi removido dos contratos e telas. As colunas históricas de MFA permanecem sem uso para evitar uma migration destrutiva; esta alteração não exige migration nova.
+Fora do Docker, configure `SEED_DEMO_PASSWORD` no `backend/.env` e a mesma credencial em `VITE_DEMO_PASSWORD` no `frontend/.env`. No Compose, `migrate` recebe essa credencial como `SEED_DEMO_PASSWORD`. A credencial é pública no frontend e não deve proteger dados reais. O seed demo não depende da senha do administrador, não altera contas existentes incompatíveis e pode ser repetido para a mesma conta demo. Em produção, `VITE_DEMO_MODE` permanece `false` por padrão; habilite-o somente em uma instalação destinada à demonstração. MFA foi removido dos contratos e telas. As colunas históricas de MFA permanecem sem uso para evitar uma migration destrutiva; esta alteração não exige migration nova.

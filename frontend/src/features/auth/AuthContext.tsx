@@ -23,7 +23,7 @@ type Status = 'loading' | 'authenticated' | 'unauthenticated';
 export interface AuthContextValue {
   user: AuthUser | null;
   status: Status;
-  login: (email: string, senha: string, codigo?: string) => Promise<void>;
+  login: (email: string, senha: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -78,11 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearPrivateState]);
 
   const login = useCallback(
-    async (email: string, senha: string, codigo?: string) => {
+    async (email: string, senha: string) => {
       const generation = clearPrivateState();
       setStatus('loading');
       try {
-        const res = await loginRequest(email, senha, codigo);
+        const res = await loginRequest(email, senha);
         if (generation !== tokenStore.getGeneration())
           throw new CanceledError('A sessão mudou.');
         tokenStore.setAccess(res.accessToken);
@@ -99,10 +99,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    clearPrivateState();
+    const generation = clearPrivateState();
+    // Aguarda limpar o cookie antes de oferecer login ou recarga da sessão.
+    setStatus('loading');
     try {
       await logoutRequest();
     } finally {
+      if (generation === tokenStore.getGeneration())
+        setStatus('unauthenticated');
       notifySessionChange();
     }
   }, [clearPrivateState]);

@@ -12,7 +12,6 @@ const schema = z
   .object({
     novaSenha: z.string().min(12).max(72),
     confirmacao: z.string(),
-    codigo: z.string().optional(),
   })
   .refine((data) => data.novaSenha === data.confirmacao, {
     path: ['confirmacao'],
@@ -42,14 +41,13 @@ export default function RecoveryPage() {
       ) : (
         <form
           className="flex flex-col gap-4"
-          onSubmit={handleSubmit(async ({ novaSenha, codigo }) => {
+          onSubmit={handleSubmit(async ({ novaSenha }) => {
             setError('');
             try {
               await withSessionLock(() =>
                 api.post('/auth/recuperar', {
                   token,
                   novaSenha,
-                  ...(codigo ? { codigo } : {}),
                 }),
               );
               notifySessionChange();
@@ -73,11 +71,6 @@ export default function RecoveryPage() {
             autoComplete="new-password"
             error={errors.confirmacao?.message}
             {...register('confirmacao')}
-          />
-          <TextField
-            label="Código MFA ou de recuperação (se ativado)"
-            autoComplete="one-time-code"
-            {...register('codigo')}
           />
           <Button type="submit" loading={isSubmitting}>
             Atualizar senha

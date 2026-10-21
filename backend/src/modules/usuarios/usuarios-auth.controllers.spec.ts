@@ -55,11 +55,7 @@ describe('handlers de usuários e reautenticação', () => {
     await expect(
       controller.reautenticar({ senha: 'minha-senha' }, admin),
     ).resolves.toEqual({ token: 't', expiresIn: 600 });
-    expect(service.reautenticar).toHaveBeenCalledWith(
-      admin,
-      'minha-senha',
-      undefined,
-    );
+    expect(service.reautenticar).toHaveBeenCalledWith(admin, 'minha-senha');
     expect(controller.me(admin)).toBe(admin);
   });
 });

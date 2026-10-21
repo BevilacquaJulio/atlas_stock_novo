@@ -13,11 +13,6 @@ const { PrismaService } = backendRequire(
 const { hash } = backendRequire('bcryptjs') as {
   hash: (value: string, rounds: number) => Promise<string>;
 };
-const { totp } = backendRequire('./dist/src/common/auth/totp.js') as {
-  totp: (secret: string, step: number) => string;
-};
-export const mfaCode = (secret: string) =>
-  totp(secret, Math.floor(Date.now() / 30000));
 const { JwtService } = backendRequire('@nestjs/jwt') as {
   JwtService: new () => {
     signAsync: (payload: object, options: object) => Promise<string>;

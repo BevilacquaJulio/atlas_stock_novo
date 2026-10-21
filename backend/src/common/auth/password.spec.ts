@@ -1,16 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as bcrypt from 'bcryptjs';
 import { hashPassword, verifyPassword } from './password';
-import {
-  decryptSecret,
-  encryptSecret,
-  newTotpSecret,
-  totp,
-  verifyTotp,
-} from './totp';
 import { itemTotal, sumMoney } from '../money';
 
-describe('senhas, TOTP e cálculo decimal', () => {
+describe('senhas e cálculo decimal', () => {
   it('hash novo tem Argon2id e salt individual', async () => {
     const first = await hashPassword('senha-sintetica-forte');
     const second = await hashPassword('senha-sintetica-forte');
@@ -25,21 +18,6 @@ describe('senhas, TOTP e cálculo decimal', () => {
     expect(
       await verifyPassword(await bcrypt.hash(password, 4), `${password}suffix`),
     ).toBe(false);
-  });
-  it('confere vetores RFC 6238 com seis dígitos e impede replay', () => {
-    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-    expect(totp(secret, 1)).toBe('287082');
-    expect(totp(secret, Math.floor(1111111109 / 30))).toBe('081804');
-    expect(verifyTotp(secret, '287082', 0, 59000)).toBe(1);
-    expect(verifyTotp(secret, '287082', 1, 59000)).toBeNull();
-  });
-  it('criptografa o segredo MFA com autenticação e nonce aleatório', () => {
-    const secret = newTotpSecret();
-    const key = 'ab'.repeat(32);
-    const encrypted = encryptSecret(secret, key);
-    expect(decryptSecret(encrypted, key)).toBe(secret);
-    expect(encryptSecret(secret, key)).not.toBe(encrypted);
-    expect(() => decryptSecret(encrypted, 'cd'.repeat(32))).toThrow();
   });
   it('arredonda cada item antes de somar o total da compra', () => {
     expect(itemTotal(0.5, 0.01)).toBe(0.01);

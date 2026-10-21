@@ -1,23 +1,3 @@
--- Execute após as migrations, no ambiente autorizado. Ajuste o schema se ainda usar g5.
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.usuarios TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.tokens_renovacao TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.categorias TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.produtos TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.fornecedores TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.clientes TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.veiculos TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.movimentacoes TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.compras TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.itens_compras TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.despesas TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.projetos TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.itens_verificacao_projetos TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.historicos_projetos TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.consumos_projetos TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.categorias_despesas TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.receitas TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.configuracoes_sistema TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.sessoes TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.recuperacoes_senha TO 'atlas_app'@'%';
-GRANT SELECT, INSERT ON atlas_estoque.eventos_auditoria TO 'atlas_app'@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE ON atlas_estoque.requisicoes_idempotentes TO 'atlas_app'@'%';
+-- Execute como DBA no ambiente autorizado. Ajuste o usuário e o database reais.
+-- A mesma conta atende à aplicação e às migrations manuais.
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, INDEX, REFERENCES ON atlas_estoque.* TO 'atlas_app'@'%';

@@ -2,7 +2,6 @@ export type Cargo = 'ADMINISTRADOR' | 'GERENTE' | 'OPERADOR';
 
 export interface AuthUser {
   sessaoId?: string;
-  mfaAtivo?: boolean;
   id: number;
   nome: string;
   email: string;

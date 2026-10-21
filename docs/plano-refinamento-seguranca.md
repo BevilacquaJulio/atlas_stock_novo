@@ -5,6 +5,8 @@ Estado original: planejamento em 11/10/2026. Implementação e evidências atual
 
 ## Objetivo e critérios gerais
 
+Este documento preserva o plano original. A política posterior removeu MFA dos fluxos e da API; os itens de MFA abaixo foram retirados do escopo por essa decisão, conforme [ajustes posteriores](refinamento-2026-10-15.md#ajustes-posteriores-solicitados-pelo-usuário).
+
 Tornar o sistema consistente, com acesso controlado, dados íntegros, execução reproduzível e uma rotina de verificação de segurança. O resultado será medido por regras e testes explícitos, sem promessa de ausência universal de vulnerabilidades.
 
 O escopo inclui backend NestJS/Prisma/MySQL, frontend React, autenticação, autorização, cadastros, compras, estoque, projetos, financeiro, Docker/Nginx/Traefik, dependências, CI, documentação e recuperação de dados.
@@ -226,7 +228,7 @@ Novas entidades terão nomes como `sessoes`, `permissoes` e `eventos_auditoria`,
 - Escolher manutenção coordenada ou expand/contract conforme disponibilidade necessária. Renomeação direta não é compatível com a aplicação antiga em execução.
 - Antes do ambiente real, verificar backup restaurável, versão anterior, passos de aplicação e recuperação. Rollback da aplicação não desfaz a migration.
 
-**Aceite:** schema de domínio conforme a convenção, API funcionando e nenhum dado perdido nos testes de atualização; contas runtime/migration com acesso limitado ao banco correto.
+**Aceite:** schema de domínio conforme a convenção, API funcionando e nenhum dado perdido nos testes de atualização; conta única da aplicação e migrations com acesso limitado ao banco correto.
 
 ## Etapa 8 — Frontend e experiência de uso
 
@@ -247,7 +249,7 @@ Novas entidades terão nomes como `sessoes`, `permissoes` e `eventos_auditoria`,
 **Prioridade:** alta para exposição/segredos; média para padronização operacional. **Dependência:** topologia e acesso de ambiente definidos.
 
 - Revisar redes externas, portas e acesso ao MySQL; frontend fora da rede do banco, ingressos públicos mínimos e sem Docker socket nos serviços.
-- Separar conta MySQL runtime da conta de migrations; runtime sem privilégio de alterar schema e ambas restritas ao banco da aplicação.
+- Usar a mesma conta MySQL para aplicação e migrations, conforme preferência do usuário; limitar permissões de dados e schema ao banco da aplicação.
 - Executar API e Nginx sem root; avaliar capabilities, no-new-privileges, filesystem somente leitura e caminhos graváveis reais.
 - Verificar HTTPS, certificados do banco, CSP/headers do HTML e armazenamento de segredos; revisar credenciais históricas com evidência e rotacionar se foram utilizadas/expostas.
 - Fixar e revisar versões/imagens de release; analisar dependências runtime, development e camadas do sistema operacional.

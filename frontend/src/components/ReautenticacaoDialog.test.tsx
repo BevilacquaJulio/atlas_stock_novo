@@ -55,7 +55,7 @@ describe('ReautenticacaoDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Confirmar' }));
 
     await expect(pedido).resolves.toBe(true);
-    expect(reautenticarRequest).toHaveBeenLastCalledWith('certa', undefined);
+    expect(reautenticarRequest).toHaveBeenLastCalledWith('certa');
     expect(reautenticacaoStore.get()).toBe('token-confirmado');
   });
 

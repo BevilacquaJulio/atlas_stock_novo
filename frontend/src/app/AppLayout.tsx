@@ -81,8 +81,8 @@ export function AppLayout() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="neon-black sticky top-0 z-30 flex items-center justify-between rounded-none px-4 py-3 text-white sm:px-6">
+    <div className="flex h-dvh flex-col overflow-hidden">
+      <header className="neon-black z-30 flex shrink-0 items-center justify-between rounded-none px-4 py-3 text-white sm:px-6">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -109,9 +109,9 @@ export function AppLayout() {
         </div>
       </header>
 
-      <div className="flex flex-1">
+      <div className="flex min-h-0 flex-1">
         {/* Sidebar desktop */}
-        <aside className="hidden w-60 shrink-0 overflow-visible border-r border-[#e5e5e5] bg-white lg:block">
+        <aside className="hidden w-60 shrink-0 overflow-y-auto border-r border-[#e5e5e5] bg-white lg:block">
           <SidebarContent activePath={location.pathname} scope="desktop" />
         </aside>
 
@@ -168,27 +168,18 @@ export function AppLayout() {
           )}
         </AnimatePresence>
 
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={location.pathname}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <Suspense
-                  fallback={
-                    <div className="flex min-h-[40vh] items-center justify-center">
-                      <Spinner />
-                    </div>
-                  }
-                >
-                  <Outlet />
-                </Suspense>
-              </motion.div>
-            </AnimatePresence>
+            <Suspense
+              key={location.pathname}
+              fallback={
+                <div className="flex min-h-[40vh] items-center justify-center">
+                  <Spinner />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

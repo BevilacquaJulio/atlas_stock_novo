@@ -43,13 +43,6 @@ export const envSchema = z
       .max(2592000)
       .default(604800),
     COOKIE_SECURE: z.enum(['true', 'false']).optional(),
-    MFA_ENCRYPTION_KEY: z
-      .string()
-      .regex(/^[a-fA-F0-9]{64}$/)
-      .optional()
-      .or(z.literal(''))
-      .transform((value) => value || undefined),
-    REQUIRE_PRIVILEGED_MFA: z.enum(['true', 'false']).default('false'),
     TRUST_PROXY: z
       .string()
       .default('')

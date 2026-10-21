@@ -2,6 +2,8 @@
 
 Base: `43dc874` (PRs #9 e #10 já integradas). Escopo: uma empresa por instalação, API NestJS/Prisma/MySQL, React/Vite, Docker/nginx/Traefik e CI. Não foram usados subagentes. Regras recebidas no chat, `.cursor/rules/agents.mdc` e skills pertinentes foram consultadas; a stack foi preservada. Vitest passou de 3.2.7 para 4.1.11 para corrigir avisos de segurança, com compatibilidade de Node/Vite verificada.
 
+As entregas e verificações abaixo registram a versão de 15/10. Os ajustes posteriores, incluindo a remoção do MFA, estão descritos ao final; as evidências históricas não substituem a validação desses ajustes.
+
 ## Decisões e entregas
 
 | Etapa                    | Entrega                                                                                                                                                                                                                                                                                                                          |
@@ -14,7 +16,7 @@ Base: `43dc874` (PRs #9 e #10 já integradas). Escopo: uma empresa por instalaç
 | Limites e contratos      | Confiança de proxy restrita a IP/CIDR configurados; login limitado por IP e conta normalizada. Corpo/coleções continuam limitados. Corpo de refresh/logout não recebe credencial. Usuários passam a ter paginação limitada.                                                                                                      |
 | Integridade              | Totais de compra arredondados por item em decimal e mesma prévia no frontend. Custo de movimentação lido sob lock. Checklist serializado com encerramento de projeto; troca de cliente de veículo com projetos é recusada. Chaves de idempotência protegem criações críticas e são mantidas pelo cliente após resultado incerto. |
 | Interface                | Seletores com busca remota e carregamento de páginas, seleção preservada na edição, estados de erro/carregamento. Segurança da conta, links administrativos de recuperação e recuperação de tela com falha. Avisos existentes de hooks resolvidos.                                                                               |
-| Operação                 | nginx sem root, porta interna 8080, headers/CSP no HTML, imagens base fixadas em digest, runtimes somente leitura/capabilities removidas no Compose. npm removido do runtime da API. Migrator com conta distinta e sem JWT. Compose local pessoal e guia ignorados no Git.                                                       |
+| Operação                 | nginx sem root, porta interna 8080, headers/CSP no HTML, imagens base fixadas em digest, runtimes somente leitura/capabilities removidas no Compose. npm removido do runtime da API. Migration manual com a mesma conta MySQL da API e sem JWT. Compose local pessoal e guia ignorados no Git.                                                       |
 | CI                       | Unitários + integração em cobertura backend, E2E, atualização com dados, restauração sintética, Gitleaks, builds Docker e Trivy, além dos gates Sonar/CodeQL existentes. Nenhum deploy automático adicionado.                                                                                                                    |
 
 ## Achados e regressões
@@ -53,8 +55,12 @@ Versões observadas: Node local 22.16.0; imagens Node 24 Alpine; Prisma Client 7
 
 Nenhum dado, conta ou migration do MySQL compartilhado foi alterado. Não houve deploy, mudança de DNS/firewall, provisionamento real de grants, troca do database ou rotação de credenciais. HTTPS, certificados MySQL, backup real, retenção e capacidade do servidor publicado dependem do aceite operacional do ambiente.
 
-Antes do release: preencher/guardar a chave MFA, separar contas runtime/migration, instalar grants para os nomes novos, verificar IPs reais de proxy e reservar manutenção coordenada. Validar backup restaurável e aplicar API/frontend juntos. A versão antiga não funciona com o schema renomeado; rollback exige restauração/configuração compatíveis. Veja `operacao.md`.
+Antes do release: conferir permissões de dados e schema da conta única no banco configurado, verificar IPs reais de proxy e reservar manutenção coordenada. Validar backup restaurável e aplicar API/frontend juntos. A versão antiga não funciona com o schema renomeado; rollback exige restauração/configuração compatíveis. Veja `operacao.md`.
 
-Políticas operacionais propostas: revisão mensal de acessos e MFA, atualização semanal de dependências/imagens e triagem dos alertas de CI, restauração mensal, backup diário criptografado com retenção de 30 dias. Responsável, RPO/RTO e agendamento reais ainda precisam ser definidos pelo operador; não foram inventados nem ativados silenciosamente.
+Políticas operacionais propostas: revisão mensal de acessos, atualização semanal de dependências/imagens e triagem dos alertas de CI, restauração mensal, backup diário criptografado com retenção de 30 dias. Responsável, RPO/RTO e agendamento reais ainda precisam ser definidos pelo operador; não foram inventados nem ativados silenciosamente.
 
 Uploads, webhooks e múltiplas empresas não fazem parte da superfície implementada inspecionada. Não foram executados ataques, scanners dinâmicos ou carga contra produção. Não há declaração de certificação ASVS ou ausência universal de vulnerabilidades. O resultado de CI/Sonar/CodeQL do PR deve ser verificado na revisão publicada antes do merge.
+
+## Ajustes posteriores solicitados pelo usuário
+
+MFA removido dos fluxos de login, reautenticação, troca/recuperação de senha e da API. Colunas históricas permanecem sem uso; nenhuma migration destrutiva foi criada. Conta demo opcional com cargo Operador, preenchimento no login e seed próprio, sem credenciais de administrador. Sidebar ocupa a altura útil da janela com rolagem separada do conteúdo. A configuração também passou a usar uma única conta MySQL para API e migrations, conforme preferência do usuário.

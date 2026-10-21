@@ -30,8 +30,6 @@ export default defineConfig({
         PORT: '13317',
         CORS_ORIGIN: 'http://127.0.0.1:4173',
         TRUST_PROXY: '127.0.0.1/32,::1/128',
-        MFA_ENCRYPTION_KEY:
-          'abababababababababababababababababababababababababababababababab',
       },
     },
     {

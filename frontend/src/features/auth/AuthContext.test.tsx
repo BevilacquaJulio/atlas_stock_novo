@@ -79,12 +79,13 @@ describe('isolamento de sessão', () => {
         }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Logout' }));
-    expect(screen.getByText('unauthenticated')).toBeInTheDocument();
+    expect(screen.getByText('loading')).toBeInTheDocument();
     expect(client.getQueryData(['private'])).toBeUndefined();
     expect(reautenticacaoStore.get()).toBeNull();
     expect(localStorage.getItem('g5.refreshToken')).toBeNull();
     expect(logoutRequest).toHaveBeenCalledWith();
     await act(async () => finish());
+    expect(screen.getByText('unauthenticated')).toBeInTheDocument();
   });
 
   it('expiração limpa dados privados em cache', async () => {

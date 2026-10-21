@@ -54,7 +54,6 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException();
       user = {
         sessaoId: payload.sid,
-        mfaAtivo: usuario.mfaAtivo,
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,

@@ -25,8 +25,6 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Configure JWT_ACCESS_SECRET}
       JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
       REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-604800}
-      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
-      REQUIRE_PRIVILEGED_MFA: ${REQUIRE_PRIVILEGED_MFA:-false}
       COOKIE_SECURE: "true"
       CORS_ORIGIN: https://${DOMAIN}
       TRUST_PROXY: ${TRUST_PROXY:-}
@@ -61,6 +59,8 @@ services:
       args:
         # VITE_* e compilado no build (build-time). Aponta para a API publica.
         VITE_API_URL: https://api.${DOMAIN}/api
+        VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
+        VITE_DEMO_PASSWORD: ${VITE_DEMO_PASSWORD:-}
     container_name: bl_g5-app
     restart: unless-stopped
     init: true
@@ -101,8 +101,8 @@ services:
       context: ./backend
       target: build
     environment:
-      MYSQL_USER: ${MYSQL_MIGRATE_USER:?Configure MYSQL_MIGRATE_USER}
-      MYSQL_PASSWORD: ${MYSQL_MIGRATE_PASSWORD:?Configure MYSQL_MIGRATE_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER:?Configure MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Configure MYSQL_PASSWORD}
       MYSQL_HOST: ${MYSQL_HOST:-mysql_shared}
       MYSQL_PORT: ${MYSQL_PORT:-3306}
       MYSQL_DATABASE: ${MYSQL_DATABASE:?Configure MYSQL_DATABASE}
@@ -111,6 +111,7 @@ services:
       MYSQL_SSL_CA_PATH: ${MYSQL_SSL_CA_PATH:-/run/secrets/mysql-ca.pem}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_DEMO_PASSWORD: ${VITE_DEMO_PASSWORD:-}
     profiles:
       - tools
     volumes:

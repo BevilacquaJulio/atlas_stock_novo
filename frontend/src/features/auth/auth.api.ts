@@ -5,13 +5,11 @@ import type { AuthUser, LoginResponse } from './auth.types';
 export async function loginRequest(
   email: string,
   senha: string,
-  codigo?: string,
 ): Promise<LoginResponse> {
   const { data } = await withSessionLock(() =>
     api.post<LoginResponse>('/auth/login', {
       email,
       senha,
-      ...(codigo ? { codigo } : {}),
     }),
   );
   return data;
@@ -35,11 +33,10 @@ export async function logoutRequest(): Promise<void> {
 /** Confirma a senha do próprio usuário para liberar ações críticas. */
 export async function reautenticarRequest(
   senha: string,
-  codigo?: string,
 ): Promise<{ token: string; expiresIn: number }> {
   const { data } = await api.post<{ token: string; expiresIn: number }>(
     '/auth/reautenticar',
-    { senha, ...(codigo ? { codigo } : {}) },
+    { senha },
   );
   return data;
 }

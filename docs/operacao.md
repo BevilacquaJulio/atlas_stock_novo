@@ -16,23 +16,23 @@ docker network ls
 
 Preencha `.env`. `MYSQL_HOST=mysql_shared` resolve dentro do Docker; `MYSQL_DATABASE` deve ser o schema real. Instalações existentes podem continuar usando `g5`; o nome não é fixado no código. O exemplo para instalações novas usa `atlas_estoque`.
 
-Gere **separadamente** o segredo JWT e a chave de criptografia MFA e salve-os no gerenciador de segredos do ambiente:
+Gere o segredo JWT e salve-o no gerenciador de segredos do ambiente:
 
 ```bash
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-A chave MFA precisa acompanhar backups e não pode ser trocada sem migrar os segredos criptografados. Nunca a copie para o frontend. Configure `CORS_ORIGIN` para a origem exata usada; o Compose de produção deriva essa origem de `DOMAIN` e força cookie Secure. Não há `JWT_REFRESH_SECRET` nesta versão.
+Configure `CORS_ORIGIN` para a origem exata usada; o Compose de produção deriva essa origem de `DOMAIN` e força cookie Secure. Não há `JWT_REFRESH_SECRET` nesta versão.
 
 Com TLS MySQL, copie a CA pública para `secrets/mysql-ca.pem`, configure `MYSQL_SSL=true` e prefira `MYSQL_SSL_REJECT_UNAUTHORIZED=true` com certificado que corresponda ao hostname. O antigo modo `false` continua configurável para transição, com perda de validação de identidade. Sem TLS, `MYSQL_SSL=false` dispensa a leitura da CA pela aplicação.
 
-Provisione contas distintas: `MYSQL_USER`/`MYSQL_PASSWORD` para runtime; `MYSQL_MIGRATE_USER`/`MYSQL_MIGRATE_PASSWORD` para DDL. Use `ops/provisionar-banco.sql.example` e, após criar as tabelas, `ops/permissoes-runtime.sql`. São instruções para o DBA executar no ambiente autorizado; não foram aplicadas ao MySQL compartilhado nesta entrega.
+Use uma única conta MySQL, configurada em `MYSQL_USER`/`MYSQL_PASSWORD`, para a aplicação e as migrations. Ela precisa de permissões de leitura, escrita e alteração de schema somente no banco da aplicação. Use `ops/provisionar-banco.sql.example` para provisionamento ou `ops/permissoes-runtime.sql` para uma conta existente, ajustando usuário e database. São instruções para o DBA executar no ambiente autorizado; não foram aplicadas ao MySQL compartilhado nesta entrega.
 
 `TRUST_PROXY` aceita apenas IPs/CIDRs dos proxies reais. Vazio ignora `X-Forwarded-For`. Verifique a origem dos pacotes no ambiente antes de configurá-lo; não use `true`, número de saltos ou uma rede inteira compartilhada como atalho. O login tem limites por IP e conta; mantenha uma instância de API com o limitador em memória. Escalar exige armazenamento compartilhado do limitador.
 
 ## Primeiro deploy
 
-Após provisionar banco e conta de migration e preencher `.env`:
+Após provisionar o banco e a conta da aplicação e preencher `.env`:
 
 ```bash
 docker compose config --quiet
@@ -40,7 +40,7 @@ docker compose build api app migrate
 docker compose run --rm migrate
 ```
 
-Conceda as permissões runtime de `ops/permissoes-runtime.sql` após as migrations. Configure os dados do administrador inicial no `.env` e execute:
+Com as permissões da conta configuradas antes das migrations, configure os dados do administrador inicial no `.env` e execute:
 
 ```bash
 docker compose run --rm migrate npx ts-node prisma/seed.ts
@@ -66,7 +66,7 @@ docker compose ps
 docker compose logs --tail=100 api app
 ```
 
-Pare se a migration falhar. Preserve o estado e examine `docker compose run --rm migrate npx prisma migrate status`; não execute `migrate reset`, `migrate dev`, alterações nas migrations históricas ou `migrate resolve` sem diagnóstico. Atualize as permissões runtime para os nomes novos antes de liberar a API. Todos os usuários entram novamente; o frontend remove o refresh legado do localStorage.
+Pare se a migration falhar. Preserve o estado e examine `docker compose run --rm migrate npx prisma migrate status`; não execute `migrate reset`, `migrate dev`, alterações nas migrations históricas ou `migrate resolve` sem diagnóstico. Confira as permissões da conta no database configurado antes de liberar a API. Todos os usuários entram novamente; o frontend remove o refresh legado do localStorage.
 
 ## Comandos por tipo de alteração
 
@@ -78,11 +78,11 @@ Pare se a migration falhar. Preserve o estado e examine `docker compose run --rm
 | Schema/migration                 | Backup, manutenção coordenada, build de `api app migrate`, `docker compose run --rm migrate`, subir API/frontend compatíveis |
 | Variável runtime da API          | `docker compose up -d --force-recreate api`                                                                                  |
 | `DOMAIN`/URL pública do frontend | `docker compose up -d --build app api` — URL e CSP são geradas no build                                                      |
-| Senhas/chave MFA                 | Rotação coordenada com consumidores; preservar capacidade de ler MFA/backups                                                 |
+| Senhas                 | Rotação coordenada com consumidores; preservar acesso aos backups                                                 |
 
 ## Backup, restauração e troca opcional de database
 
-Defina responsável, retenção e RPO/RTO antes de operar produção. Ponto inicial: backup diário criptografado, retenção de 30 dias e cópia fora do servidor; o responsável deve aprovar os objetivos e testar restauração mensalmente. Preserve `.env` e a chave MFA em armazenamento protegido separado. Não copie dumps para Git/imagens.
+Defina responsável, retenção e RPO/RTO antes de operar produção. Ponto inicial: backup diário criptografado, retenção de 30 dias e cópia fora do servidor; o responsável deve aprovar os objetivos e testar restauração mensalmente. Preserve `.env` em armazenamento protegido separado. Não copie dumps para Git/imagens.
 
 Crie `secrets/backup.cnf` a partir de `ops/mysql-backup.cnf.example`, com conta de backup e o hostname `mysql_shared`. Os comandos seguintes são para shell Bash no servidor, com redes e autorização correspondentes:
 
@@ -107,6 +107,21 @@ Rollback de imagem não desfaz renomeações. Se precisar voltar à versão ante
 
 ## Auditoria e idempotência
 
-`eventos_auditoria` registra ator, método, recurso, requestId e status HTTP sem corpos, senhas ou tokens. Eventos `*:COMMIT`, resultado `0`, são persistidos na mesma transação de contas, compras, estoque, consumo e financeiro; o evento HTTP posterior registra o resultado externo. Se a auditoria transacional falhar, o efeito reverte. Falha ao persistir o evento HTTP gera erro operacional no log. Runtime tem somente SELECT/INSERT nessa tabela; retenção é tarefa de DBA, separada da conta da aplicação.
+`eventos_auditoria` registra ator, método, recurso, requestId e status HTTP sem corpos, senhas ou tokens. Eventos `*:COMMIT`, resultado `0`, são persistidos na mesma transação de contas, compras, estoque, consumo e financeiro; o evento HTTP posterior registra o resultado externo. Se a auditoria transacional falhar, o efeito reverte. Falha ao persistir o evento HTTP gera erro operacional no log. A aplicação insere eventos nessa tabela; a conta única também possui permissões de manutenção do schema. A retenção deve ser definida pelo operador.
 
 O cliente envia `Idempotency-Key` em criações. Compras, movimentações, receitas/despesas e consumo de projeto reservam a chave por usuário e verificam o resumo da entrada. Repetição concluída devolve a resposta original. Chave em andamento, com entrada diferente ou resultado incerto devolve 409; consulte os registros antes de repetir. Reservas não expiram automaticamente para evitar duplicação tardia. O DBA define retenção após reconciliação. Clientes antigos sem o cabeçalho continuam compatíveis e não recebem essa deduplicação.
+
+
+### Conta de demonstração local
+
+O Compose local habilita o modo de demonstração. Configure `VITE_DEMO_PASSWORD` no `.env` da raiz com uma credencial pública exclusiva desta instalação, com pelo menos 12 caracteres; nunca reutilize senha privada ou administrativa. O botão preenche `demo@atlas.com` e essa credencial, sem entrar automaticamente. Sem senha configurada, o botão fica oculto. A conta tem cargo Operador e não possui acesso financeiro nem administração de usuários. Ela possui as permissões operacionais normais desse cargo sobre os dados desta instalação; use uma instalação de demonstração.
+
+Após as migrations, crie a conta com a ferramenta manual (PowerShell na raiz):
+
+```powershell
+docker compose build migrate
+docker compose run --rm --no-deps migrate npm run db:seed:demo
+docker compose -f docker-compose.local.yml up -d --build
+```
+
+Fora do Docker, configure `SEED_DEMO_PASSWORD` no `backend/.env` e a mesma credencial em `VITE_DEMO_PASSWORD` no `frontend/.env`. No Compose, `migrate` recebe essa credencial como `SEED_DEMO_PASSWORD`. A credencial é pública no frontend e não deve proteger dados reais. O seed demo não depende da senha do administrador, não altera contas existentes incompatíveis e pode ser repetido para a mesma conta demo. Em produção, `VITE_DEMO_MODE` permanece `false` por padrão; habilite-o somente em uma instalação destinada à demonstração. MFA foi removido dos contratos e telas. As colunas históricas de MFA permanecem sem uso para evitar uma migration destrutiva; esta alteração não exige migration nova.

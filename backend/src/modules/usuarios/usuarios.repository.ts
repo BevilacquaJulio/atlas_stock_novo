@@ -12,7 +12,6 @@ export const usuarioSelect = {
   acessoFinanceiro: true,
   createdAt: true,
   updatedAt: true,
-  mfaAtivo: true,
 } satisfies Prisma.UsuarioSelect;
 
 @Injectable()

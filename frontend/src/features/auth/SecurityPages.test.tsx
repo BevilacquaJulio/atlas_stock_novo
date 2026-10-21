@@ -22,7 +22,6 @@ const authUser = {
   cargo: 'ADMINISTRADOR',
   acessoFinanceiro: true,
   sessaoId: 'current',
-  mfaAtivo: false,
 };
 vi.mock('./useAuth', () => ({ useAuth: () => ({ user: authUser, logout }) }));
 const original = api.defaults.adapter;
@@ -30,7 +29,6 @@ const requests: { url?: string; method?: string; data?: unknown }[] = [];
 let fail = '';
 beforeEach(() => {
   logout.mockReset();
-  authUser.mfaAtivo = false;
   requests.length = 0;
   fail = '';
   api.defaults.adapter = async (config) => {
@@ -66,15 +64,6 @@ beforeEach(() => {
           expiraEm: '2026-11-01T12:00:00Z',
         },
       ];
-    if (config.url === '/auth/mfa/configurar')
-      response.data = {
-        secret: 'SYNTHETIC-SETUP-KEY',
-        uri: 'otpauth://synthetic',
-      };
-    if (config.url === '/auth/mfa/ativar')
-      response.data = {
-        recoveryCodes: ['synthetic-code-one', 'synthetic-code-two'],
-      };
     return response;
   };
 });
@@ -101,6 +90,18 @@ function mount(element: React.ReactNode) {
 }
 
 describe('segurança da conta', () => {
+  it('mantém senha e sessões sem controles de MFA', () => {
+    mount(<SecurityPage />);
+    expect(
+      screen.getByRole('heading', { name: 'Alterar senha' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Sessões ativas' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Autenticação em duas etapas' }),
+    ).not.toBeInTheDocument();
+  });
   it('troca a senha e encerra a sessão somente após confirmação do servidor', async () => {
     mount(<SecurityPage />);
     fireEvent.change(screen.getByLabelText('Senha atual'), {
@@ -139,41 +140,6 @@ describe('segurança da conta', () => {
       'nova-senha-sintetica',
     );
     expect(logout).not.toHaveBeenCalled();
-  });
-  it('ativa MFA, mostra códigos uma vez e só sai quando a pessoa os guardou', async () => {
-    mount(<SecurityPage />);
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Configurar MFA' }),
-    );
-    expect(await screen.findByText('SYNTHETIC-SETUP-KEY')).toBeInTheDocument();
-    fireEvent.change(
-      screen.getByLabelText('Código do autenticador ou de recuperação'),
-      { target: { value: '123456' } },
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Ativar MFA' }));
-    expect(await screen.findByText(/synthetic-code-one/)).toBeInTheDocument();
-    expect(logout).not.toHaveBeenCalled();
-    await userEvent.click(
-      screen.getByRole('button', {
-        name: 'Guardei os códigos; entrar novamente',
-      }),
-    );
-    expect(logout).toHaveBeenCalledTimes(1);
-  });
-  it('desativa MFA com o código informado e encerra a sessão', async () => {
-    authUser.mfaAtivo = true;
-    mount(<SecurityPage />);
-    fireEvent.change(
-      screen.getByLabelText('Código do autenticador ou de recuperação'),
-      { target: { value: '123456' } },
-    );
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Desativar MFA e encerrar sessões' }),
-    );
-    await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
-    expect(
-      requests.find((request) => request.url === '/auth/mfa/desativar')?.data,
-    ).toEqual({ codigo: '123456' });
   });
   it('permite encerrar outra sessão e a própria sessão', async () => {
     mount(<SecurityPage />);
@@ -244,10 +210,6 @@ describe('recuperação de senha', () => {
     fireEvent.change(screen.getByLabelText('Confirme a nova senha'), {
       target: { value: 'nova-senha-sintetica' },
     });
-    fireEvent.change(
-      screen.getByLabelText('Código MFA ou de recuperação (se ativado)'),
-      { target: { value: '123456' } },
-    );
     await userEvent.click(
       screen.getByRole('button', { name: 'Atualizar senha' }),
     );

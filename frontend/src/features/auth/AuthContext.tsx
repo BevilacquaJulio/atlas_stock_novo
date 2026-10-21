@@ -23,7 +23,7 @@ type Status = 'loading' | 'authenticated' | 'unauthenticated';
 export interface AuthContextValue {
   user: AuthUser | null;
   status: Status;
-  login: (email: string, senha: string, codigo?: string) => Promise<void>;
+  login: (email: string, senha: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -78,11 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearPrivateState]);
 
   const login = useCallback(
-    async (email: string, senha: string, codigo?: string) => {
+    async (email: string, senha: string) => {
       const generation = clearPrivateState();
       setStatus('loading');
       try {
-        const res = await loginRequest(email, senha, codigo);
+        const res = await loginRequest(email, senha);
         if (generation !== tokenStore.getGeneration())
           throw new CanceledError('A sessão mudou.');
         tokenStore.setAccess(res.accessToken);

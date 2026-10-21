@@ -16,7 +16,7 @@ npm ci
 cp .env.example .env
 ```
 
-Configure `backend/.env`: banco/usuário já provisionados, `JWT_ACCESS_SECRET` exclusivo de pelo menos 32 caracteres e `MFA_ENCRYPTION_KEY` com 64 dígitos hexadecimais para habilitar MFA. Não use os placeholders. A CLI Prisma carrega `.env` explicitamente via dotenv.
+Configure `backend/.env`: banco/usuário já provisionados e `JWT_ACCESS_SECRET` exclusivo de pelo menos 32 caracteres. Não use os placeholders. A CLI Prisma carrega `.env` explicitamente via dotenv.
 
 Para **banco novo ou ambiente autorizado**, depois de revisar as migrations:
 
@@ -43,12 +43,13 @@ Abra `http://localhost:5173`. O frontend usa `/api` e o proxy Vite encaminha par
 ## Contas e acesso
 
 - Administradores gerenciam usuários e acessam o financeiro. Gerentes precisam de permissão financeira explícita. Operadores não acessam o financeiro nem inativam registros.
-- Pagamentos, recebimentos e gestão de acessos exigem confirmação da própria senha; com MFA ativo também exigem um código. A confirmação é vinculada à sessão.
-- `Segurança da conta` permite trocar senha, configurar MFA TOTP, guardar oito códigos de recuperação de uso único e encerrar sessões próprias.
-- O administrador gera um link de recuperação em `Usuários` e o entrega ao titular. Expira em 15 minutos e funciona uma vez. MFA ativo continua exigindo código na recuperação de senha.
+- Pagamentos, recebimentos e gestão de acessos exigem confirmação da própria senha. A confirmação é vinculada à sessão.
+- `Segurança da conta` permite trocar senha e encerrar sessões próprias.
+- O administrador gera um link de recuperação em `Usuários` e o entrega ao titular. Expira em 15 minutos e funciona uma vez.
 - Novas senhas usam Argon2id. O login de conta bcrypt existente atualiza o hash após validar a senha, sem exigir troca imediata.
 - Refresh opaco em cookie HttpOnly; access JWT em memória. Web Locks coordena as abas. Use HTTPS em produção; HTTP somente em localhost/`.localhost` para desenvolvimento.
-- Após cadastrar MFA nas contas privilegiadas, configure `REQUIRE_PRIVILEGED_MFA=true` para exigi-lo em ações críticas de administradores e usuários financeiros.
+- MFA foi removido dos fluxos e da API. As colunas históricas permanecem sem uso, sem migration destrutiva.
+- A conta de demonstração é opcional e possui perfil Operador, sem acesso financeiro ou administrativo. Para uma instalação de demonstração, execute `npm run db:seed:demo` em `backend` e habilite `VITE_DEMO_MODE=true` antes do build do frontend. O padrão é `false`; detalhes em [operação](docs/operacao.md#conta-de-demonstração-local).
 
 ## Verificação
 
@@ -71,7 +72,7 @@ Cobertura backend inclui integração MySQL e exige as variáveis de ambiente is
 
 Consulte [operação e recuperação](docs/operacao.md) antes de atualizar. Esta versão renomeia tabelas/colunas: exige manutenção coordenada, backup restaurável e atualização da API e frontend juntos. Sessões anteriores exigem novo login. As seis migrations históricas foram preservadas.
 
-O Compose de produção mantém `api`, `app` e o serviço manual `migrate`. Frontend em `https://${DOMAIN}`; API em `https://api.${DOMAIN}/api`. Ambos os runtimes usam usuário sem root. O migrator tem credenciais MySQL próprias; a API não recebe essas credenciais.
+O Compose de produção mantém `api`, `app` e o serviço manual `migrate`. Frontend em `https://${DOMAIN}`; API em `https://api.${DOMAIN}/api`. Ambos os runtimes usam usuário sem root. API e serviço manual de migration usam a mesma conta, configurada em `MYSQL_USER` e `MYSQL_PASSWORD`.
 
 O Compose local pessoal `docker-compose.local.yml` e `readme-ignored.md` ficam ignorados no Git, conforme a regra do projeto. O local abre em `http://${PROJECT}.localhost`, usa proxy `/api` no nginx e não publica portas dos serviços.
 

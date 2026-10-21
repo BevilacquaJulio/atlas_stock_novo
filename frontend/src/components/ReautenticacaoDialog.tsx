@@ -15,7 +15,6 @@ import { reautenticarRequest } from '../features/auth/auth.api';
 
 const schema = z.object({
   senha: z.string().min(1, 'Informe sua senha.'),
-  codigo: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -57,13 +56,10 @@ export function ReautenticacaoDialog() {
   // Se a tela sair do ar com o pedido aberto, a ação pendente é cancelada.
   useEffect(() => () => resolver.current?.(false), []);
 
-  const confirmar = async ({ senha, codigo }: FormValues) => {
+  const confirmar = async ({ senha }: FormValues) => {
     setErro(null);
     try {
-      const { token, expiresIn } = await reautenticarRequest(
-        senha,
-        codigo || undefined,
-      );
+      const { token, expiresIn } = await reautenticarRequest(senha);
       reautenticacaoStore.set(token, expiresIn);
       encerrar(true);
     } catch (err) {
@@ -102,11 +98,6 @@ export function ReautenticacaoDialog() {
           autoFocus
           error={errors.senha?.message}
           {...register('senha')}
-        />
-        <TextField
-          label="Código MFA (se ativado)"
-          autoComplete="one-time-code"
-          {...register('codigo')}
         />
       </form>
     </Modal>

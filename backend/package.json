@@ -15,6 +15,7 @@
     "prisma:studio": "prisma studio",
     "prisma:check": "ts-node src/prisma/prisma.check.ts",
     "db:seed": "ts-node prisma/seed.ts",
+    "db:seed:demo": "ts-node prisma/seed-demo.ts",
     "db:populate": "ts-node prisma/populate.ts",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "lint:ci": "eslint \"src/**/*.ts\"",

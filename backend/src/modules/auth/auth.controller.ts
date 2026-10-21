@@ -22,7 +22,6 @@ import {
   ReautenticarDto,
   ChangePasswordDto,
   RecoverPasswordDto,
-  MfaCodeDto,
   RefreshDto,
 } from './dto/auth.dto';
 import { Public } from '../../common/decorators/public.decorator';
@@ -62,7 +61,6 @@ export class AuthController {
     const { refreshToken, ...result } = await this.service.login(
       dto.email,
       dto.senha,
-      dto.codigo,
     );
     setRefreshCookie(res, this.config, refreshToken);
     return result;
@@ -121,7 +119,7 @@ export class AuthController {
     @Body() dto: ReautenticarDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.service.reautenticar(user, dto.senha, dto.codigo);
+    return this.service.reautenticar(user, dto.senha);
   }
 
   @Post('senha')
@@ -132,12 +130,7 @@ export class AuthController {
     @CurrentUser() user: AuthenticatedUser,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.service.changePassword(
-      user,
-      dto.senhaAtual,
-      dto.novaSenha,
-      dto.codigo,
-    );
+    await this.service.changePassword(user, dto.senhaAtual, dto.novaSenha);
     clearRefreshCookie(res, this.config);
   }
 
@@ -162,7 +155,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     requireBrowserOrigin(req, this.config);
-    await this.service.recoverPassword(dto.token, dto.novaSenha, dto.codigo);
+    await this.service.recoverPassword(dto.token, dto.novaSenha);
     clearRefreshCookie(res, this.config);
   }
 
@@ -178,40 +171,5 @@ export class AuthController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ) {
     return this.service.revokeSession(user, id);
-  }
-
-  @Post('mfa/configurar')
-  @ExigeReautenticacao()
-  setupMfa(
-    @CurrentUser() user: AuthenticatedUser,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    res.setHeader('Cache-Control', 'no-store');
-    return this.service.setupMfa(user);
-  }
-
-  @Post('mfa/ativar')
-  @ExigeReautenticacao()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  enableMfa(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: MfaCodeDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    clearRefreshCookie(res, this.config);
-    return this.service.enableMfa(user, dto.codigo);
-  }
-
-  @Post('mfa/desativar')
-  @ExigeReautenticacao()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @HttpCode(HttpStatus.NO_CONTENT)
-  disableMfa(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: MfaCodeDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    clearRefreshCookie(res, this.config);
-    return this.service.disableMfa(user, dto.codigo);
   }
 }

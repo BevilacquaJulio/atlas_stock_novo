@@ -9,7 +9,6 @@ import { AuthService } from '../src/modules/auth/auth.service';
 import { RefreshTokenRepository } from '../src/modules/auth/refresh-token.repository';
 import { UsuariosRepository } from '../src/modules/usuarios/usuarios.repository';
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
-import { totp } from '../src/common/auth/totp';
 import { testDatabase } from './mysql-fixture';
 
 const prisma = testDatabase();
@@ -18,7 +17,6 @@ const tokens = new RefreshTokenRepository(prisma);
 const jwt = new JwtService();
 const config = new ConfigService({
   JWT_ACCESS_SECRET: 'synthetic-account-access-for-testing-only',
-  MFA_ENCRYPTION_KEY: 'ab'.repeat(32),
 });
 const service = new AuthService(usuarios, tokens, jwt, config);
 const guard = new JwtAuthGuard(jwt, config, new Reflector(), usuarios);
@@ -55,6 +53,15 @@ afterAll(async () => {
 });
 
 describe('ciclo completo de contas em MySQL descartável', () => {
+  it('não exige MFA legado no login após a remoção da funcionalidade', async () => {
+    await prisma.usuario.update({ where: { id }, data: { mfaAtivo: true } });
+    const login = await service.login(email, password);
+    expect(await checkAccess(login.accessToken)).toBe(true);
+    expect(login.user).not.toHaveProperty('mfaAtivo');
+    expect(await service.reautenticar(login.user, password)).toHaveProperty(
+      'token',
+    );
+  });
   it('migra bcrypt após login e logout invalida imediatamente o access token', async () => {
     const login = await service.login(email, password);
     const stored = await prisma.usuario.findUniqueOrThrow({ where: { id } });
@@ -146,45 +153,5 @@ describe('ciclo completo de contas em MySQL descartável', () => {
       'expiraEm',
       'id',
     ]);
-  });
-
-  it('MFA criptografa segredo, exige código, impede replay e consome recuperação uma vez', async () => {
-    const login = await service.login(email, password);
-    const other = await service.login(email, password);
-    const setup = await service.setupMfa(login.user);
-    const code = totp(setup.secret, Math.floor(Date.now() / 30000));
-    const result = await service.enableMfa(login.user, code);
-    expect(result.recoveryCodes).toHaveLength(8);
-    const stored = await prisma.usuario.findUniqueOrThrow({ where: { id } });
-    expect(stored.mfaSegredo).not.toContain(setup.secret);
-    expect(JSON.stringify(stored.mfaRecuperacao)).not.toContain(
-      result.recoveryCodes[0],
-    );
-    await expect(checkAccess(other.accessToken)).rejects.toThrow();
-    await expect(service.login(email, password)).rejects.toThrow(
-      'Informe um código MFA',
-    );
-    await expect(service.login(email, password, code)).rejects.toThrow(
-      'Informe um código MFA',
-    );
-    const withMfa = await service.login(
-      email,
-      password,
-      result.recoveryCodes[0],
-    );
-    await expect(
-      service.login(email, password, result.recoveryCodes[0]),
-    ).rejects.toThrow('Informe um código MFA');
-    await expect(
-      service.recoverPassword(
-        (await service.createRecovery(id)).token,
-        password,
-      ),
-    ).rejects.toThrow('Informe um código MFA');
-    await service.disableMfa(withMfa.user, result.recoveryCodes[1]);
-    await expect(checkAccess(withMfa.accessToken)).rejects.toThrow();
-    await expect(service.login(email, password)).resolves.toHaveProperty(
-      'accessToken',
-    );
   });
 });

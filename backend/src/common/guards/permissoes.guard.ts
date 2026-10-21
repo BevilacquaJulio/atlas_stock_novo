@@ -59,19 +59,6 @@ export class PermissoesGuard implements CanActivate {
     }
 
     if (this.marcado(context, REAUTENTICACAO_KEY)) {
-      if (
-        this.config.get<string>('REQUIRE_PRIVILEGED_MFA') === 'true' &&
-        user &&
-        (user.cargo === 'ADMINISTRADOR' || user.acessoFinanceiro) &&
-        !user.mfaAtivo &&
-        !['setupMfa', 'enableMfa'].includes(context.getHandler().name)
-      ) {
-        throw new ForbiddenException({
-          code: 'MFA_CONFIGURACAO_NECESSARIA',
-          message:
-            'Configure o MFA em Segurança da conta antes de executar ações críticas.',
-        });
-      }
       await this.exigirReautenticacao(request, user);
     }
     return true;

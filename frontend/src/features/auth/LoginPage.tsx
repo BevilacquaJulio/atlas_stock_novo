@@ -10,11 +10,11 @@ import { TextField } from '../../components/form/TextField';
 import { Button } from '../../components/Button';
 import { Alert } from '../../components/feedback';
 import { BrandLogo } from '../../components/BrandLogo';
+import { demoAccount, isDemoEnabled } from './demo-account';
 
 const loginSchema = z.object({
   email: z.string().email('E-mail inválido.'),
   senha: z.string().min(1, 'Informe a senha.'),
-  codigo: z.string().optional(),
 });
 type LoginForm = z.infer<typeof loginSchema>;
 
@@ -25,6 +25,7 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
 
@@ -35,7 +36,7 @@ export default function LoginPage() {
   const onSubmit = async (values: LoginForm) => {
     setApiError(null);
     try {
-      await login(values.email, values.senha, values.codigo || undefined);
+      await login(values.email, values.senha);
       navigate('/', { replace: true });
     } catch (err) {
       setApiError(getApiErrorMessage(err, 'Não foi possível entrar.'));
@@ -103,14 +104,31 @@ export default function LoginPage() {
             error={errors.senha?.message}
             {...register('senha')}
           />
-          <TextField
-            label="Código MFA (se ativado)"
-            autoComplete="one-time-code"
-            {...register('codigo')}
-          />
           <Button type="submit" loading={isSubmitting} className="mt-2 w-full">
             Entrar
           </Button>
+          {isDemoEnabled() && (
+            <div className="border-t border-[#e5e5e5] pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isSubmitting}
+                className="w-full"
+                onClick={() => {
+                  setApiError(null);
+                  reset({
+                    email: demoAccount.email,
+                    senha: demoAccount.password,
+                  });
+                }}
+              >
+                Preencher conta de demonstração
+              </Button>
+              <p className="mt-2 text-center text-xs text-[#0a0a0a]/55">
+                Perfil Operador, sem acesso financeiro ou administrativo.
+              </p>
+            </div>
+          )}
         </form>
       </motion.div>
     </main>

@@ -1,41 +1,4 @@
-import { test, expect, login, mfaCode } from './fixtures';
-
-test('MFA pode ser configurado e o login aceita um código de recuperação', async ({
-  page,
-  scenario,
-}) => {
-  await login(page, scenario.adminEmail, scenario.password);
-  await page.goto('/seguranca');
-  await page.getByRole('button', { name: 'Configurar MFA' }).click();
-  const confirmation = page.getByRole('dialog', { name: 'Confirme sua senha' });
-  await confirmation
-    .getByLabel('Sua senha', { exact: true })
-    .fill(scenario.password);
-  await confirmation
-    .getByRole('button', { name: 'Confirmar', exact: true })
-    .click();
-  const section = page
-    .getByRole('heading', { name: 'Autenticação em duas etapas' })
-    .locator('..');
-  const secret = await section.locator('code').innerText();
-  await section
-    .getByLabel('Código do autenticador ou de recuperação')
-    .fill(mfaCode(secret));
-  await section.getByRole('button', { name: 'Ativar MFA' }).click();
-  const codes = (await section.locator('pre').innerText()).trim().split('\n');
-  expect(codes).toHaveLength(8);
-  await section
-    .getByRole('button', { name: 'Guardei os códigos; entrar novamente' })
-    .click();
-  await expect(page).toHaveURL(/\/login$/);
-  await page.getByLabel('E-mail', { exact: true }).fill(scenario.adminEmail);
-  await page.getByLabel('Senha', { exact: true }).fill(scenario.password);
-  await page.getByLabel('Código MFA (se ativado)').fill(codes[0]);
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:4173/');
-  await page.goto('/seguranca');
-  await expect(page.getByText('MFA está ativo.')).toBeVisible();
-});
+import { test, expect, login } from './fixtures';
 
 test('seletor encontra cliente fora dos primeiros 100 e preserva na edição', async ({
   page,

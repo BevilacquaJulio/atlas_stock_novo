@@ -29,7 +29,7 @@ formato padrão `{ error: { code, message } }` (filtro global de exceções).
    npm ci
    ```
 2. **Configurar ambiente** — copie `.env.example` para `.env` e ajuste as
-   variáveis `MYSQL_*`, `JWT_ACCESS_SECRET`, `MFA_ENCRYPTION_KEY` e `CORS_ORIGIN`:
+   variáveis `MYSQL_*`, `JWT_ACCESS_SECRET`, `CORS_ORIGIN`:
    ```bash
    cp .env.example .env
    ```
@@ -89,7 +89,7 @@ npm run test:cov  # unitários + MySQL isolado; veja ../docs/validacao.md
 
 ## Decisões
 
-Leia [operação e transição de schema](../docs/operacao.md) antes de atualizar uma instalação. Cookies, CSRF, recuperação pelo administrador, MFA e duas abas fazem parte do contrato atual; [inventário de endpoints](../docs/inventario-endpoints.md).
+Leia [operação e transição de schema](../docs/operacao.md) antes de atualizar uma instalação. Cookies, CSRF, recuperação pelo administrador e duas abas fazem parte do contrato atual; [inventário de endpoints](../docs/inventario-endpoints.md).
 
 - **Segredos só em env** — nada de credencial no código (o legado tinha a senha
   do banco hardcoded em `config/database.php`; aqui vai para `.env`).

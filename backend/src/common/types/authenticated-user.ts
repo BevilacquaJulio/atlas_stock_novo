@@ -3,7 +3,6 @@ import type { Cargo } from '../../../generated/prisma/client';
 /** Payload do access token / usuário anexado à request após o JwtAuthGuard. */
 export interface AuthenticatedUser {
   sessaoId?: string;
-  mfaAtivo?: boolean;
   id: number;
   nome: string;
   email: string;

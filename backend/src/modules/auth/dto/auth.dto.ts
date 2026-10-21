@@ -2,17 +2,10 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { newPasswordSchema } from '../../../common/validators/bounds';
 
-const codigo = z
-  .string()
-  .trim()
-  .regex(/^(\d{6}|[a-f0-9]{20})$/)
-  .optional();
-
 export const loginSchema = z
   .object({
     email: z.string().trim().email().max(180),
     senha: z.string().min(1).max(1024),
-    codigo,
   })
   .strict();
 export class LoginDto extends createZodDto(loginSchema) {}
@@ -23,7 +16,6 @@ export class RefreshDto extends createZodDto(refreshSchema) {}
 export const reautenticarSchema = z
   .object({
     senha: z.string().min(1).max(1024),
-    codigo,
   })
   .strict();
 export class ReautenticarDto extends createZodDto(reautenticarSchema) {}
@@ -33,7 +25,6 @@ export class ChangePasswordDto extends createZodDto(
     .object({
       senhaAtual: z.string().min(1).max(1024),
       novaSenha: newPasswordSchema,
-      codigo,
     })
     .strict(),
 ) {}
@@ -42,10 +33,6 @@ export class RecoverPasswordDto extends createZodDto(
     .object({
       token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
       novaSenha: newPasswordSchema,
-      codigo,
     })
     .strict(),
-) {}
-export class MfaCodeDto extends createZodDto(
-  z.object({ codigo: z.string().regex(/^(\d{6}|[a-f0-9]{20})$/) }).strict(),
 ) {}

@@ -1,9 +1,4 @@
-import {
-  createHash,
-  randomBytes,
-  randomUUID,
-  timingSafeEqual,
-} from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   Injectable,
@@ -21,12 +16,6 @@ import {
 } from '../../common/auth/jwt-policy';
 import { temAcessoFinanceiro } from '../../common/auth/permissoes';
 import { hashPassword, verifyPassword } from '../../common/auth/password';
-import {
-  decryptSecret,
-  encryptSecret,
-  newTotpSecret,
-  verifyTotp,
-} from '../../common/auth/totp';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Cargo, Prisma } from '../../../generated/prisma/client';
 
@@ -49,11 +38,7 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  async login(
-    email: string,
-    senha: string,
-    codigo?: string,
-  ): Promise<LoginResult> {
+  async login(email: string, senha: string): Promise<LoginResult> {
     const candidate = await this.usuarios.findByEmailWithSenha(email);
     const fallback = await dummyArgonHash;
     // Durante a transição ambos os algoritmos custam trabalho também para e-mail inexistente.
@@ -73,7 +58,6 @@ export class AuthService {
       const current = await this.usuarios.findByIdWithSenha(candidate.id, tx);
       if (!current?.ativo || current.senha !== candidate.senha)
         throw new UnauthorizedException('Credenciais inválidas.');
-      if (current.mfaAtivo) await this.validateMfa(current, codigo, tx);
       if (upgraded)
         await tx.usuario.update({
           where: { id: current.id },
@@ -143,12 +127,11 @@ export class AuthService {
       );
   }
 
-  async reautenticar(user: AuthenticatedUser, senha: string, codigo?: string) {
+  async reautenticar(user: AuthenticatedUser, senha: string) {
     return this.refreshTokens.withUserLock(user.id, async (tx) => {
       const current = await this.usuarios.findByIdWithSenha(user.id, tx);
       if (!current?.ativo || !(await verifyPassword(current.senha, senha)))
         throw new BadRequestException('Senha incorreta.');
-      if (current.mfaAtivo) await this.validateMfa(current, codigo, tx);
       const token = await this.jwt.signAsync(
         { purpose: 'reautenticacao', sub: user.id, sid: user.sessaoId },
         {
@@ -168,14 +151,12 @@ export class AuthService {
     user: AuthenticatedUser,
     senhaAtual: string,
     novaSenha: string,
-    codigo?: string,
   ) {
     const hash = await hashPassword(novaSenha);
     await this.refreshTokens.withUserLock(user.id, async (tx) => {
       const current = await this.usuarios.findByIdWithSenha(user.id, tx);
       if (!current?.ativo || !(await verifyPassword(current.senha, senhaAtual)))
         throw new BadRequestException('Senha incorreta.');
-      if (current.mfaAtivo) await this.validateMfa(current, codigo, tx);
       await tx.usuario.update({
         where: { id: user.id },
         data: { senha: hash },
@@ -209,7 +190,7 @@ export class AuthService {
     return { token, expiresIn: 900 };
   }
 
-  async recoverPassword(token: string, novaSenha: string, codigo?: string) {
+  async recoverPassword(token: string, novaSenha: string) {
     const row = await this.usuarios.findRecovery(digest(token));
     if (!row) throw new BadRequestException('Link inválido ou expirado.');
     const hash = await hashPassword(novaSenha);
@@ -225,7 +206,6 @@ export class AuthService {
         !current?.ativo
       )
         throw new BadRequestException('Link inválido ou expirado.');
-      if (current.mfaAtivo) await this.validateMfa(current, codigo, tx);
       await tx.recuperacaoSenha.updateMany({
         where: { usuarioId: row.usuarioId, usadoEm: null },
         data: { usadoEm: new Date() },
@@ -251,122 +231,6 @@ export class AuthService {
     });
   }
 
-  async setupMfa(user: AuthenticatedUser) {
-    const secret = newTotpSecret();
-    const encrypted = encryptSecret(secret, this.mfaKey());
-    await this.refreshTokens.withUserLock(user.id, async (tx) => {
-      const current = await this.usuarios.findByIdWithSenha(user.id, tx);
-      if (current?.mfaAtivo)
-        throw new BadRequestException('MFA já está ativo.');
-      await tx.usuario.update({
-        where: { id: user.id },
-        data: { mfaSegredo: encrypted, mfaUltimoPasso: 0 },
-      });
-    });
-    return {
-      secret,
-      uri: `otpauth://totp/Atlas%20Stock:${encodeURIComponent(user.email)}?secret=${secret}&issuer=Atlas%20Stock&algorithm=SHA1&digits=6&period=30`,
-    };
-  }
-
-  async enableMfa(user: AuthenticatedUser, codigo: string) {
-    const codes = Array.from({ length: 8 }, () =>
-      randomBytes(10).toString('hex'),
-    );
-    await this.refreshTokens.withUserLock(user.id, async (tx) => {
-      const current = await this.usuarios.findByIdWithSenha(user.id, tx);
-      if (!current?.mfaSegredo || current.mfaAtivo)
-        throw new BadRequestException('Inicie a configuração do MFA.');
-      await this.validateMfa(current, codigo, tx);
-      await tx.usuario.update({
-        where: { id: user.id },
-        data: { mfaAtivo: true, mfaRecuperacao: codes.map(digest) },
-      });
-      const others = await tx.sessao.findMany({
-        where: {
-          usuarioId: user.id,
-          id: { not: user.sessaoId },
-          revogadoEm: null,
-        },
-        select: { id: true },
-      });
-      for (const session of others)
-        await this.refreshTokens.revokeSession(session.id, tx);
-    });
-    return { recoveryCodes: codes };
-  }
-
-  async disableMfa(user: AuthenticatedUser, codigo: string) {
-    await this.refreshTokens.withUserLock(user.id, async (tx) => {
-      const current = await this.usuarios.findByIdWithSenha(user.id, tx);
-      if (!current?.mfaAtivo)
-        throw new BadRequestException('MFA não está ativo.');
-      await this.validateMfa(current, codigo, tx);
-      await tx.usuario.update({
-        where: { id: user.id },
-        data: {
-          mfaAtivo: false,
-          mfaSegredo: null,
-          mfaRecuperacao: [],
-          mfaUltimoPasso: 0,
-        },
-      });
-      await this.refreshTokens.revokeAllForUser(user.id, tx);
-    });
-  }
-
-  private async validateMfa(
-    user: {
-      id: number;
-      mfaSegredo: string | null;
-      mfaUltimoPasso: number;
-      mfaRecuperacao: Prisma.JsonValue;
-    },
-    code: string | undefined,
-    tx: Prisma.TransactionClient,
-  ) {
-    const deny = () =>
-      new UnauthorizedException({
-        code: 'MFA_NECESSARIO',
-        message: 'Informe um código MFA válido ou um código de recuperação.',
-      });
-    if (!code || !user.mfaSegredo) throw deny();
-    const step = verifyTotp(
-      decryptSecret(user.mfaSegredo, this.mfaKey()),
-      code,
-      user.mfaUltimoPasso,
-    );
-    if (step !== null) {
-      await tx.usuario.update({
-        where: { id: user.id },
-        data: { mfaUltimoPasso: step },
-      });
-      return;
-    }
-    const codes = Array.isArray(user.mfaRecuperacao)
-      ? user.mfaRecuperacao.filter((c): c is string => typeof c === 'string')
-      : [];
-    const index = codes.findIndex(
-      (hash) =>
-        hash.length === 64 &&
-        timingSafeEqual(Buffer.from(hash), Buffer.from(digest(code))),
-    );
-    if (index < 0) throw deny();
-    codes.splice(index, 1);
-    await tx.usuario.update({
-      where: { id: user.id },
-      data: { mfaRecuperacao: codes },
-    });
-  }
-
-  private mfaKey(): string {
-    const key = this.config.get<string>('MFA_ENCRYPTION_KEY');
-    if (!key || !/^[a-fA-F0-9]{64}$/.test(key))
-      throw new BadRequestException(
-        'MFA indisponível: configure a chave de criptografia no servidor.',
-      );
-    return key;
-  }
   private expiration() {
     return new Date(
       Date.now() +
@@ -382,7 +246,6 @@ export class AuthService {
     email: string;
     cargo: Cargo;
     acessoFinanceiro: boolean;
-    mfaAtivo?: boolean;
   }): AuthenticatedUser {
     return {
       id: user.id,
@@ -390,7 +253,6 @@ export class AuthService {
       email: user.email,
       cargo: user.cargo,
       acessoFinanceiro: temAcessoFinanceiro(user),
-      mfaAtivo: user.mfaAtivo ?? false,
     };
   }
   private async issueTokens(

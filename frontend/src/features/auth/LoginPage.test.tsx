@@ -1,83 +1,107 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import LoginPage from './LoginPage';
+import { demoAccount } from './demo-account';
 
-const loginMock = vi.fn();
-
+const login = vi.fn();
 vi.mock('./useAuth', () => ({
-  useAuth: () => ({
-    login: loginMock,
-    logout: vi.fn(),
-    user: null,
-    status: 'unauthenticated',
-  }),
+  useAuth: () => ({ login, status: 'unauthenticated' }),
 }));
+beforeEach(() => {
+  login.mockReset();
+  vi.stubEnv('VITE_DEMO_MODE', 'true');
+});
+afterEach(() => vi.unstubAllEnvs());
 
-function renderPage() {
-  return render(
-    <MemoryRouter>
-      <LoginPage />
-    </MemoryRouter>,
-  );
-}
-
-describe('LoginPage', () => {
-  beforeEach(() => {
-    loginMock.mockReset();
-  });
-
-  it('mostra erro de validação quando o e-mail é inválido', async () => {
-    const user = userEvent.setup();
-    renderPage();
-
-    await user.type(screen.getByLabelText('E-mail'), 'não-é-email');
-    await user.type(screen.getByLabelText('Senha'), '123456');
-    await user.click(screen.getByRole('button', { name: 'Entrar' }));
-
+describe('login sem MFA e conta de demonstração', () => {
+  it('valida o e-mail antes de chamar a API', async () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText('E-mail'), {
+      target: { value: 'email-invalido' },
+    });
+    fireEvent.change(screen.getByLabelText('Senha'), {
+      target: { value: 'senha-sintetica' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
     expect(await screen.findByText('E-mail inválido.')).toBeInTheDocument();
-    expect(loginMock).not.toHaveBeenCalled();
+    expect(login).not.toHaveBeenCalled();
   });
-
-  it('não oferece credenciais de demonstração', () => {
-    renderPage();
-    expect(
-      screen.queryByRole('button', { name: 'Preencher acesso demo' }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('E-mail')).toHaveValue('');
-    expect(screen.getByLabelText('Senha')).toHaveValue('');
-  });
-
-  it('chama login com credenciais válidas', async () => {
-    const user = userEvent.setup();
-    loginMock.mockResolvedValueOnce(undefined);
-    renderPage();
-
-    await user.type(screen.getByLabelText('E-mail'), 'admin@atlas.com');
-    await user.type(screen.getByLabelText('Senha'), 'admin123');
-    await user.click(screen.getByRole('button', { name: 'Entrar' }));
-
+  it('permite entrar com credenciais próprias', async () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText('E-mail'), {
+      target: { value: 'conta@example.test' },
+    });
+    fireEvent.change(screen.getByLabelText('Senha'), {
+      target: { value: 'senha-sintetica' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
     await waitFor(() =>
-      expect(loginMock).toHaveBeenCalledWith(
-        'admin@atlas.com',
-        'admin123',
-        undefined,
+      expect(login).toHaveBeenCalledWith(
+        'conta@example.test',
+        'senha-sintetica',
       ),
     );
   });
-
-  it('exibe mensagem quando o login falha', async () => {
-    const user = userEvent.setup();
-    loginMock.mockRejectedValueOnce(new Error('boom'));
-    renderPage();
-
-    await user.type(screen.getByLabelText('E-mail'), 'admin@atlas.com');
-    await user.type(screen.getByLabelText('Senha'), 'errada');
-    await user.click(screen.getByRole('button', { name: 'Entrar' }));
-
+  it('exibe uma mensagem segura quando o login falha', async () => {
+    login.mockRejectedValueOnce(new Error('synthetic-private-detail'));
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText('E-mail'), {
+      target: { value: 'conta@example.test' },
+    });
+    fireEvent.change(screen.getByLabelText('Senha'), {
+      target: { value: 'senha-errada' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
     expect(
       await screen.findByText('Não foi possível entrar.'),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText('synthetic-private-detail'),
+    ).not.toBeInTheDocument();
+  });
+  it('preenche somente a conta demo e aguarda a confirmação de entrada', async () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Preencher conta de demonstração' }),
+    );
+    expect(screen.getByLabelText('E-mail')).toHaveValue(demoAccount.email);
+    expect(screen.getByLabelText('Senha')).toHaveValue(demoAccount.password);
+    expect(screen.queryByLabelText(/MFA/)).not.toBeInTheDocument();
+    expect(login).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    await waitFor(() =>
+      expect(login).toHaveBeenCalledWith(
+        demoAccount.email,
+        demoAccount.password,
+      ),
+    );
+  });
+  it('não oferece credenciais demo quando a demonstração está desabilitada no build', () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'false');
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Preencher conta de demonstração' }),
+    ).not.toBeInTheDocument();
   });
 });

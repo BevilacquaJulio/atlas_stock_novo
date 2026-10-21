@@ -112,17 +112,18 @@ export default function LoginPage() {
               <Button
                 type="button"
                 variant="secondary"
-                disabled={isSubmitting}
+                loading={isSubmitting}
                 className="w-full"
-                onClick={() => {
+                onClick={async () => {
                   setApiError(null);
                   reset({
                     email: demoAccount.email,
                     senha: demoAccount.password,
                   });
+                  await handleSubmit(onSubmit)();
                 }}
               >
-                Preencher conta de demonstração
+                Entrar com conta de demonstração
               </Button>
               <p className="mt-2 text-center text-xs text-[#0a0a0a]/55">
                 Perfil Operador, sem acesso financeiro ou administrativo.

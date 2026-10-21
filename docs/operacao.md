@@ -114,7 +114,7 @@ O cliente envia `Idempotency-Key` em criações. Compras, movimentações, recei
 
 ### Conta de demonstração local
 
-O Compose local habilita o modo de demonstração. Configure `VITE_DEMO_PASSWORD` no `.env` da raiz com uma credencial pública exclusiva desta instalação, com pelo menos 12 caracteres; nunca reutilize senha privada ou administrativa. O botão preenche `demo@atlas.com` e essa credencial, sem entrar automaticamente. Sem senha configurada, o botão fica oculto. A conta tem cargo Operador e não possui acesso financeiro nem administração de usuários. Ela possui as permissões operacionais normais desse cargo sobre os dados desta instalação; use uma instalação de demonstração.
+O Compose local habilita o modo de demonstração. Configure `VITE_DEMO_PASSWORD` no `.env` da raiz com uma credencial pública exclusiva desta instalação, com pelo menos 12 caracteres; nunca reutilize senha privada ou administrativa. O botão "Entrar com conta de demonstração" preenche `demo@atlas.com` e essa credencial e efetua o login no mesmo clique. Sem senha configurada, o botão fica oculto. A conta tem cargo Operador e não possui acesso financeiro nem administração de usuários. Ela possui as permissões operacionais normais desse cargo sobre os dados desta instalação; use uma instalação de demonstração.
 
 Após as migrations, crie a conta com a ferramenta manual (PowerShell na raiz):
 

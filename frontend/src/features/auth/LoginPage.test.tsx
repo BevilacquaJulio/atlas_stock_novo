@@ -73,26 +73,66 @@ describe('login sem MFA e conta de demonstração', () => {
       screen.queryByText('synthetic-private-detail'),
     ).not.toBeInTheDocument();
   });
-  it('preenche somente a conta demo e aguarda a confirmação de entrada', async () => {
+  it('substitui credenciais inválidas e entra com a conta demo em um clique', async () => {
     render(
       <MemoryRouter>
         <LoginPage />
       </MemoryRouter>,
     );
+    fireEvent.change(screen.getByLabelText('E-mail'), {
+      target: { value: 'email-invalido' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect(await screen.findByText('E-mail inválido.')).toBeInTheDocument();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Preencher conta de demonstração' }),
+      screen.getByRole('button', { name: 'Entrar com conta de demonstração' }),
     );
     expect(screen.getByLabelText('E-mail')).toHaveValue(demoAccount.email);
     expect(screen.getByLabelText('Senha')).toHaveValue(demoAccount.password);
     expect(screen.queryByLabelText(/MFA/)).not.toBeInTheDocument();
-    expect(login).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
     await waitFor(() =>
       expect(login).toHaveBeenCalledWith(
         demoAccount.email,
         demoAccount.password,
       ),
     );
+    expect(login).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.queryByText('E-mail inválido.')).not.toBeInTheDocument(),
+    );
+  });
+  it('bloqueia novas entradas enquanto o login demo está pendente e permite tentar após falha', async () => {
+    let rejectLogin!: (reason: Error) => void;
+    login.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectLogin = reject;
+        }),
+    );
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    const demoButton = screen.getByRole('button', {
+      name: 'Entrar com conta de demonstração',
+    });
+    fireEvent.click(demoButton);
+    await waitFor(() => expect(login).toHaveBeenCalledTimes(1));
+    expect(demoButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Entrar' })).toBeDisabled();
+    fireEvent.click(demoButton);
+    expect(login).toHaveBeenCalledTimes(1);
+    rejectLogin(new Error('synthetic-private-detail'));
+    expect(
+      await screen.findByText('Não foi possível entrar.'),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(demoButton).toBeEnabled());
+    fireEvent.click(demoButton);
+    await waitFor(() => expect(login).toHaveBeenCalledTimes(2));
+    expect(
+      screen.queryByText('Não foi possível entrar.'),
+    ).not.toBeInTheDocument();
   });
   it('não oferece credenciais demo quando a demonstração está desabilitada no build', () => {
     vi.stubEnv('VITE_DEMO_MODE', 'false');
@@ -102,7 +142,9 @@ describe('login sem MFA e conta de demonstração', () => {
       </MemoryRouter>,
     );
     expect(
-      screen.queryByRole('button', { name: 'Preencher conta de demonstração' }),
+      screen.queryByRole('button', {
+        name: 'Entrar com conta de demonstração',
+      }),
     ).not.toBeInTheDocument();
   });
   it('não oferece conta demo sem senha configurada', () => {
@@ -113,7 +155,9 @@ describe('login sem MFA e conta de demonstração', () => {
       </MemoryRouter>,
     );
     expect(
-      screen.queryByRole('button', { name: 'Preencher conta de demonstração' }),
+      screen.queryByRole('button', {
+        name: 'Entrar com conta de demonstração',
+      }),
     ).not.toBeInTheDocument();
   });
 });
